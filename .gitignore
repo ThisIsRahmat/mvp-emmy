@@ -20,9 +20,6 @@
 /[Uu]ser[Ss]ettings/
 *.log
 
-Assets/CC_Assets/Character.Fbx
-Assets/CC_Assets/Meshes/Character/
-
 venv/
 
 .env
