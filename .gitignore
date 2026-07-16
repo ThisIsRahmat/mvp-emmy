@@ -20,8 +20,16 @@
 /[Uu]ser[Ss]ettings/
 *.log
 
-venv/
+Assets/CC_Assets/Character.Fbx
+Assets/CC_Assets/Meshes/Character/
 
+Library/
+Temp/
+Obj/
+Logs/
+Build/
+
+venv/
 .env
 
 # By default unity supports Blender asset imports, *.blend1 blender files do not need to be committed to version control.
