@@ -10,6 +10,30 @@
 #
 # Get latest from https://github.com/github/gitignore/blob/main/Unity.gitignore
 #
+
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+
+# Virtual environments
+venv/
+.venv/
+
+# macOS
+.DS_Store
+
+# Generated output
+outputs/audio/
+outputs/*.wav
+
+# Optional
+.pytest_cache/
+.mypy_cache/
+.idea/
+.vscode/
+
 .utmp/
 /[Ll]ibrary/
 /[Tt]emp/
