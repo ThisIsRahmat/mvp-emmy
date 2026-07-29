@@ -15,6 +15,9 @@ public class ConversationController : MonoBehaviour
     [SerializeField]
     private AudioSource speechAudioSource;
 
+    [SerializeField]
+    private AudioClip startupGreeting;
+
     [Header("Embodiment")]
     [SerializeField]
     private AudioDrivenLipSync lipSync;
@@ -37,11 +40,71 @@ public class ConversationController : MonoBehaviour
 
     private bool isBusy;
 
+    private void Start()
+    {
+        StartCoroutine(PlayStartupSequence());
+    }
+
+    private IEnumerator PlayStartupSequence()
+    {
+        isBusy = true;
+
+        SetState("Startup");
+
+        if (characterAnimator != null)
+        {
+            characterAnimator.SetTrigger("Wave");
+        }
+
+        if (speechAudioSource != null && startupGreeting != null)
+        {
+            speechAudioSource.clip = startupGreeting;
+            speechAudioSource.Play();
+
+            while (speechAudioSource.isPlaying)
+            {
+                yield return null;
+            }
+        }
+        else
+        {
+            Debug.LogWarning(
+                "No startup greeting or AudioSource has been assigned."
+            );
+
+            yield return new WaitForSeconds(2f);
+        }
+
+        isBusy = false;
+        SetState("Idle");
+
+        Debug.Log("Startup complete. Agent is ready.");
+    }
+
+    public void BeginListening()
+    {
+        if (isBusy)
+        {
+            Debug.LogWarning(
+                "The agent cannot listen while processing or speaking."
+            );
+
+            return;
+        }
+
+        SetState("Listening");
+
+        Debug.Log("Agent is listening.");
+    }
+
     public void ProcessRecording(string recordingPath)
     {
         if (isBusy)
         {
-            Debug.LogWarning("The agent is already processing a request.");
+            Debug.LogWarning(
+                "The agent is already processing a request."
+            );
+
             return;
         }
 
@@ -62,11 +125,15 @@ public class ConversationController : MonoBehaviour
         }
         catch (Exception error)
         {
-            HandleError($"Could not read recording: {error.Message}");
+            HandleError(
+                $"Could not read recording: {error.Message}"
+            );
+
             yield break;
         }
 
         WWWForm form = new WWWForm();
+
         form.AddBinaryData(
             "audio",
             audioBytes,
@@ -101,15 +168,30 @@ public class ConversationController : MonoBehaviour
         }
         catch (Exception error)
         {
-            HandleError($"Could not parse response: {error.Message}");
+            HandleError(
+                $"Could not parse response: {error.Message}"
+            );
+
             yield break;
         }
 
-        transcriptionText.text = response.transcription;
-        responseText.text = response.response_speech;
-        codeText.text = response.response_code;
+        if (transcriptionText != null)
+        {
+            transcriptionText.text = response.transcription;
+        }
 
-        string fullAudioUrl = backendBaseUrl + response.audio_url;
+        if (responseText != null)
+        {
+            responseText.text = response.response_speech;
+        }
+
+        if (codeText != null)
+        {
+            codeText.text = response.response_code;
+        }
+
+        string fullAudioUrl =
+            backendBaseUrl + response.audio_url;
 
         yield return StartCoroutine(
             DownloadAndPlayAudio(fullAudioUrl)
@@ -131,11 +213,15 @@ public class ConversationController : MonoBehaviour
 
         if (request.result != UnityWebRequest.Result.Success)
         {
-            HandleError($"Audio download failed: {request.error}");
+            HandleError(
+                $"Audio download failed: {request.error}"
+            );
+
             yield break;
         }
 
-        AudioClip clip = DownloadHandlerAudioClip.GetContent(request);
+        AudioClip clip =
+            DownloadHandlerAudioClip.GetContent(request);
 
         speechAudioSource.clip = clip;
 
@@ -151,6 +237,8 @@ public class ConversationController : MonoBehaviour
 
     private void SetState(string state)
     {
+        Debug.Log($"Agent state: {state}");
+
         if (statusText != null)
         {
             statusText.text = state;
@@ -181,16 +269,11 @@ public class ConversationController : MonoBehaviour
     {
         Debug.LogError(message);
 
-        if (statusText != null)
-        {
-            statusText.text = "Error";
-        }
-
         isBusy = false;
+
         SetState("Idle");
     }
 }
-
 
 [Serializable]
 public class AgentResponse
