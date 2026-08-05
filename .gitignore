@@ -28,6 +28,10 @@ venv/
 outputs/audio/
 outputs/*.wav
 
+
+Assets/Samples/uLipSync/*
+
+
 # Optional
 .pytest_cache/
 .mypy_cache/
