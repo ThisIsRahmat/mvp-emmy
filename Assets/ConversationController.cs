@@ -16,6 +16,9 @@ public class ConversationController : MonoBehaviour
     private string agentEndpoint = "/agent/respond";
 
     [SerializeField]
+    private string greetingEndpoint = "/agent/greeting";
+
+    [SerializeField]
     private string uploadFieldName = "audio";
 
     [Header("Microphone")]
@@ -25,9 +28,6 @@ public class ConversationController : MonoBehaviour
     [Header("Audio")]
     [SerializeField]
     private AudioSource speechAudioSource;
-
-    [SerializeField]
-    private AudioClip startupGreeting;
 
     [Header("Embodiment")]
     [SerializeField]
@@ -95,50 +95,137 @@ public class ConversationController : MonoBehaviour
         }
     }
 
-    private IEnumerator PlayStartupSequence()
+private IEnumerator PlayStartupSequence()
+{
+    isBusy = true;
+    isRecording = false;
+
+    SetState(AgentState.Startup);
+
+    if (characterAnimator != null)
     {
-        isBusy = true;
-        isRecording = false;
-
-        SetState(AgentState.Startup);
-
-        if (characterAnimator != null)
-        {
-            characterAnimator.ResetTrigger("Wave");
-            characterAnimator.SetTrigger("Wave");
-        }
-
-        if (speechAudioSource != null && startupGreeting != null)
-        {
-            speechAudioSource.Stop();
-            speechAudioSource.clip = startupGreeting;
-            speechAudioSource.Play();
-
-            while (speechAudioSource.isPlaying)
-            {
-                yield return null;
-            }
-        }
-        else
-        {
-            Debug.LogWarning(
-                "Startup greeting could not play because the AudioSource " +
-                "or startup AudioClip has not been assigned."
-            );
-
-            yield return new WaitForSeconds(1f);
-        }
-
-        isBusy = false;
-        SetState(AgentState.Idle);
-
-        Debug.Log("Startup complete. Agent is ready.");
+        characterAnimator.ResetTrigger("Wave");
+        characterAnimator.SetTrigger("Wave");
     }
 
-    /// <summary>
-    /// Starts the push-to-talk interaction.
-    /// This may also be called from a Unity UI button.
-    /// </summary>
+    bool greetingSucceeded = false;
+
+    yield return StartCoroutine(
+        RequestGreeting(
+            success => greetingSucceeded = success
+        )
+    );
+
+    if (!greetingSucceeded)
+    {
+        Debug.LogWarning(
+            "Startup greeting failed, but the agent will remain usable."
+        );
+    }
+
+    isBusy = false;
+
+    SetState(AgentState.Idle);
+
+    Debug.Log(
+        "Startup complete. Agent is ready."
+    );
+}
+
+private IEnumerator RequestGreeting(
+    Action<bool> completed
+)
+{
+    string requestUrl = BuildUrl(
+        backendBaseUrl,
+        greetingEndpoint
+    );
+
+    Debug.Log(
+        $"Requesting greeting from: {requestUrl}"
+    );
+
+    using UnityWebRequest request =
+        UnityWebRequest.Post(
+            requestUrl,
+            new WWWForm()
+        );
+
+    yield return request.SendWebRequest();
+
+    if (
+        request.result !=
+        UnityWebRequest.Result.Success
+    )
+    {
+        Debug.LogError(
+            $"Greeting request failed.\n" +
+            $"URL: {requestUrl}\n" +
+            $"Status: {request.responseCode}\n" +
+            $"Error: {request.error}\n" +
+            $"Response: {request.downloadHandler.text}"
+        );
+
+        completed?.Invoke(false);
+        yield break;
+    }
+
+    GreetingResponse response;
+
+    try
+    {
+        response =
+            JsonUtility.FromJson<GreetingResponse>(
+                request.downloadHandler.text
+            );
+    }
+    catch (Exception error)
+    {
+        Debug.LogError(
+            $"Could not parse greeting response: " +
+            $"{error.Message}"
+        );
+
+        completed?.Invoke(false);
+        yield break;
+    }
+
+    if (
+        response == null ||
+        string.IsNullOrWhiteSpace(
+            response.audio_url
+        )
+    )
+    {
+        Debug.LogError(
+            "Greeting response did not contain an audio URL."
+        );
+
+        completed?.Invoke(false);
+        yield break;
+    }
+
+    Debug.Log(
+        $"Greeting text: {response.text}"
+    );
+
+    string fullAudioUrl = BuildUrl(
+        backendBaseUrl,
+        response.audio_url
+    );
+
+    bool audioSucceeded = false;
+
+    yield return StartCoroutine(
+        DownloadAndPlayAudio(
+            fullAudioUrl,
+            success => audioSucceeded = success
+        )
+    );
+
+    completed?.Invoke(audioSucceeded);
+}
+
     public void StartListening()
     {
         if (isBusy)
@@ -691,5 +778,13 @@ public class AgentResponse
     public string transcription;
     public string response_speech;
     public string response_code;
+    public string text;
+    public string audio_url;
+}
+
+[Serializable]
+public class GreetingResponse
+{
+    public string text;
     public string audio_url;
 }

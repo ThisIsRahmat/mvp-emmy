@@ -1,0 +1,64 @@
+.custom-label {
+    font-size: 20px;
+    -unity-font-style: bold;
+    color: rgb(68, 138, 255);
+}
+
+.settings-panel {
+    padding: 24px 8px;
+}
+
+.settings-section {
+    margin-bottom: 12px;
+}
+
+.agent-settings-section {
+    margin-top: 8px;
+}
+
+.settings-field {
+    margin-top: 8px;
+    margin-bottom: 12px;
+    min-height: 32px;
+}
+
+.custom-prompt-field {
+    min-height: 130px;
+    margin-top: 14px;
+}
+
+.custom-prompt-field .unity-text-input {
+    min-height: 100px;
+    white-space: normal;
+}
+
+.primary-button {
+    margin-top: 16px;
+    margin-bottom: 12px;
+    height: 38px;
+    min-width: 140px;
+    align-self: flex-end;
+}
+
+.section-title {
+    -unity-font-style: bold;
+    font-size: 15px;
+
+    margin-top: 16px;
+    margin-bottom: 8px;
+}
+
+.chat-bubble {
+    padding: 8px 12px;
+    margin: 4px 8px;
+    border-radius: 8px;
+    white-space: normal;
+}
+.chat-bubble-user {
+    background-color: rgb(60, 110, 200);
+    align-self: flex-end;
+}
+.chat-bubble-agent {
+    background-color: rgb(70, 70, 70);
+    align-self: flex-start;
+}

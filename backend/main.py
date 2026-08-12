@@ -4,6 +4,7 @@ from tempfile import NamedTemporaryFile
 
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel
 
 from backend.services.transcription_service import TranscriptionService
 from backend.services.llm_service import LLMService
@@ -21,39 +22,161 @@ app.mount(
     name="audio",
 )
 
-transcription_service = TranscriptionService()
-llm_service = LLMService()
-speech_service = SpeechService(output_directory=audio_directory)
 
+class AgentSettings(BaseModel):
+    agent_type: str
+    llm: str
+    tts: str
+    tts_voice: str = ""
+    custom_prompt: str = ""
+
+
+# Changes the UI names to actual backend model names
+llm_models = {
+    "Gemma 3": "gemma3:4b",
+    "Qwen3": "qwen3:4b",
+    "Devstral": "devstral:latest",
+    "DeepSeek-v4 Flash": "deepseek-v4-flash:latest",
+}
+
+
+tts_models = {
+    "Kokoro": "kokoro",
+    "Piper": "piper"
+}
+
+
+
+default_settings = AgentSettings(
+    agent_type="Peer",
+    llm="Qwen 3",
+    tts="Kokoro",
+    custom_prompt="",
+)
+
+current_settings = default_settings 
+
+
+def build_services(settings: AgentSettings):
+    if settings.llm not in llm_models:
+        raise ValueError(f"Unsupported LLM selection: {settings.llm}")
+    if settings.tts not in tts_models:
+        raise ValueError(f"Unsupported TTS selection: {settings.tts}")
+
+
+    llm_service = LLMService(model=llm_models[settings.llm], agent_type=settings.agent_type, custom_prompt=settings.custom_prompt)
+    speech_service = SpeechService(model=tts_models[settings.tts], voice=settings.tts_voice, output_directory=audio_directory)
+
+    return llm_service, speech_service
+
+@app.get("/health")
+def health():
+    return {
+        "message": "Backend is running.",
+        "settings": current_settings,
+    }
+
+
+@app.post("/settings")
+def update_settings(settings: AgentSettings):
+    global current_settings
+    global llm_service
+    global speech_service
+
+    try:
+        current_settings = settings
+        conversation_service.start_session(
+            agent_type=settings.agent_type,
+            llm=settings.llm,
+            tts=settings.tts,
+            stt=settings.stt,
+        )
+
+        return {
+            "message": "Agent configured successfully.",
+            "settings": settings,
+        }
+
+    except Exception as error:
+        raise HTTPException(
+            status_code=400,
+            detail=str(error),
+        ) from error
+
+@app.post("/agent/greeting")
+def agent_greeting():
+    greeting_text = (
+        "Hi, I'm your AI companion. "
+        "Hold the space bar when you're ready to talk."
+    )
+
+    audio_path = speech_service.generate_speech(
+        greeting_text
+    )
+
+    relative_path = audio_path.relative_to(
+        audio_directory
+    )
+
+    return {
+        "text": greeting_text,
+        "audio_url": f"/audio/{relative_path.as_posix()}",
+    }
 
 @app.post("/agent/respond")
-def agent_respond(audio: UploadFile = File(...)):
+def agent_respond(
+    audio: UploadFile = File(...)
+):
     temporary_path = None
 
     try:
-        with NamedTemporaryFile(suffix=".wav", delete=False) as temp_file:
-            copyfileobj(audio.file, temp_file)
-            temporary_path = Path(temp_file.name)
+        with NamedTemporaryFile(
+            suffix=".wav",
+            delete=False,
+        ) as temp_file:
 
-        transcription = transcription_service.transcribe_audio(
-            temporary_path
+            copyfileobj(
+                audio.file,
+                temp_file,
+            )
+
+            temporary_path = Path(
+                temp_file.name
+            )
+
+        transcription = (
+            transcription_service.transcribe_audio(
+                temporary_path
+            )
         )
 
-        llm_result = llm_service.generate_response(
-            transcription
+        llm_result = (
+            llm_service.generate_response(
+                transcription
+            )
         )
 
-        audio_path = speech_service.generate_speech(
+        conversation_service.add_agent_message(
             llm_result.response_speech
         )
 
-        relative_path = audio_path.relative_to(audio_directory)
+        audio_path = (
+            speech_service.generate_speech(
+                llm_result.response_speech
+            )
+        )
+
+        relative_path = audio_path.relative_to(
+            audio_directory
+        )
 
         return {
             "transcription": transcription,
             "response_speech": llm_result.response_speech,
             "response_code": llm_result.response_code,
-            "audio_url": f"/audio/{relative_path.as_posix()}",
+            "audio_url": (
+                f"/audio/{relative_path.as_posix()}"
+            ),
         }
 
     except Exception as error:
@@ -65,5 +188,14 @@ def agent_respond(audio: UploadFile = File(...)):
     finally:
         audio.file.close()
 
-        if temporary_path and temporary_path.exists():
+        if (
+            temporary_path
+            and temporary_path.exists()
+        ):
             temporary_path.unlink()
+
+@app.get("/conversation")
+def get_conversation():
+    if conversation_service.current_session is None:
+        return {"messages": []}
+    return {"messages": [m.model_dump() for m in conversation_service.current_session.messages]}

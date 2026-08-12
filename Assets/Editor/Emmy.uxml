@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ui:UXML
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xmlns:ui="UnityEngine.UIElements"
+    xmlns:uie="UnityEditor.UIElements"
+    xsi:noNamespaceSchemaLocation="../../UIElementsSchema/UIElements.xsd"
+>
+    <Style src="project://database/Assets/Editor/Emmy.uss?fileID=7433441132597879392&amp;guid=992d9607311384f5e9bddbf6b0037b1d&amp;type=3#Emmy" />
+
+    <ui:TabView
+        reorderable="false"
+        view-data-key="TabbedMenu"
+        class="emmy-tabs"
+    >
+        <ui:Tab
+            label="Settings"
+            view-data-key="SettingsTab"
+        >
+           <ui:ScrollView class="settings-scroll">
+    <ui:VisualElement class="settings-panel">
+
+        <ui:VisualElement class="settings-section agent-settings-section">
+
+            <ui:Label
+                text="Agent Characteristics"
+                class="section-title"
+            />
+
+            <ui:DropdownField
+                label="Agent Type"
+                name="agent-type-dropdown"
+                class="settings-field"
+            />
+
+            <ui:TextField
+                label="Custom Character Prompt"
+                name="custom-prompt-field"
+                multiline="true"
+                class="settings-field custom-prompt-field"
+            />
+
+        </ui:VisualElement>
+
+        <ui:VisualElement class="settings-section">
+<ui:Label
+                text="Select Models"
+                class="section-title"
+            />
+
+            <ui:DropdownField
+                label="Large Language Model"
+                name="llm-dropdown"
+                class="settings-field"
+            />
+
+       <ui:DropdownField
+    label="Text-to-Speech Model"
+    name="tts-dropdown"
+    class="settings-field"
+/>
+
+<ui:DropdownField
+    label="Voice"
+    name="tts-voice-dropdown"
+    class="settings-field"
+/>
+
+    
+        </ui:VisualElement>
+
+        <ui:Button
+            text="Start"
+            name="save-settings-button"
+            class="primary-button"
+        />
+
+    </ui:VisualElement>
+</ui:ScrollView>
+        </ui:Tab>
+
+        <ui:Tab
+            label="Conversation History"
+            view-data-key="ConversationHistoryTab"
+        >
+          <ui:Tab
+            label="Conversation History"
+            view-data-key="ConversationHistoryTab"
+        >
+            <ui:ScrollView
+                name="conversation-scroll"
+                class="conversation-scroll"
+            />
+        </ui:Tab>
+        </ui:Tab>
+    </ui:TabView>
+</ui:UXML>

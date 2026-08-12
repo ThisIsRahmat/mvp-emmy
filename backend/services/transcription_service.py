@@ -1,21 +1,37 @@
-import whisper
 
 
 class TranscriptionService:
     def __init__(
         self,
-        transcription_client=None,
-        model_name: str = "base",
+        model: str = "whisper",
+        model_name: str | None = None
     ):
-        self.transcription_client = (
-            transcription_client
-            if transcription_client is not None
-            else whisper.load_model(model_name)
-        )
+        self.model = model
 
-    def transcribe_audio(self, audio_path: str) -> str:
-        result = self.transcription_client.transcribe(
-            str(audio_path)
-        )
+        if self.model == "whisper":
+            whisper_model = model_name or "base.en"
 
-        return result["text"].strip()
+            self.client = whisper.load_model(
+                whisper_model
+            )
+        else:
+            raise ValueError(
+                f"Unsupported STT model: {self.model}"
+            )
+
+    def transcribe_audio(
+        self,
+        audio_path
+    ) -> str:
+
+        if self.model == "whisper":
+            result = self.client.transcribe(
+                str(audio_path)
+            )
+
+            return result["text"].strip()
+
+        else:
+            raise ValueError(
+                f"Unsupported STT model: {self.model}"
+            )
