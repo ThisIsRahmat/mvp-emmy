@@ -145,3 +145,10 @@ InitTestScene*.unity*
 
 # Auto-generated scenes by play mode tests
 /[Aa]ssets/[Ii]nit[Tt]est[Ss]cene*.unity*
+
+# Ignore runtime outputs
+outputs/
+
+# Local editor/schema and UI toolkit workspace
+UIElementsSchema/
+Assets/UI Toolkit/
