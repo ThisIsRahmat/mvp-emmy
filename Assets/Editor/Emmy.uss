@@ -1,64 +1,85 @@
-.custom-label {
+.screen-root {
+    flex-grow: 1;
+
+    align-items: flex-end;
+    justify-content: center;
+
+    padding-right: 30px;
+    padding-top: 30px;
+    padding-bottom: 30px;
+}
+
+.emmy-window {
+    width: 380px;
+    height: 440px;
+
+    background-color: rgb(225, 225, 225);
+
+    border-radius: 10px;
+}
+
+.emmy-tabs {
+    flex-grow: 1;
+}
+
+.settings-scroll {
+    flex-grow: 1;
+    height: 520px;
+    /* min-height: 0; */
+}
+
+.settings-wrench {
+    position: absolute;
+
+    right: 20px;
+    top: 20px;
+
+    width: 42px;
+    height: 42px;
+
     font-size: 20px;
-    -unity-font-style: bold;
-    color: rgb(68, 138, 255);
+
+    border-radius: 21px;
 }
 
 .settings-panel {
-    padding: 24px 8px;
+    padding-top: 20px;
+    padding-right: 20px;
+    padding-bottom: 20px;
+    padding-left: 20px;
 }
 
 .settings-section {
-    margin-bottom: 12px;
-}
-
-.agent-settings-section {
-    margin-top: 8px;
-}
-
-.settings-field {
-    margin-top: 8px;
-    margin-bottom: 12px;
-    min-height: 32px;
-}
-
-.custom-prompt-field {
-    min-height: 130px;
-    margin-top: 14px;
-}
-
-.custom-prompt-field .unity-text-input {
-    min-height: 100px;
-    white-space: normal;
-}
-
-.primary-button {
-    margin-top: 16px;
-    margin-bottom: 12px;
-    height: 38px;
-    min-width: 140px;
-    align-self: flex-end;
+    margin-bottom: 20px;
 }
 
 .section-title {
     -unity-font-style: bold;
-    font-size: 15px;
 
-    margin-top: 16px;
-    margin-bottom: 8px;
+    font-size: 16px;
+
+    margin-bottom: 12px;
 }
 
-.chat-bubble {
-    padding: 8px 12px;
-    margin: 4px 8px;
-    border-radius: 8px;
-    white-space: normal;
+.settings-field {
+    margin-bottom: 10px;
 }
-.chat-bubble-user {
-    background-color: rgb(60, 110, 200);
-    align-self: flex-end;
+
+.custom-prompt-field {
+    min-height: 80px;
 }
-.chat-bubble-agent {
-    background-color: rgb(70, 70, 70);
-    align-self: flex-start;
+
+.primary-button {
+    height: 38px;
+
+    margin-top: 10px;
+}
+
+.conversation-scroll {
+    flex-grow: 1;
+
+    padding-top: 15px;
+    padding-right: 15px;
+    padding-bottom: 15px;
+    padding-left: 15px;
 }

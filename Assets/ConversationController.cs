@@ -60,10 +60,21 @@ public class ConversationController : MonoBehaviour
         ValidateReferences();
     }
 
-    private void Start()
+    private bool hasStarted = false;
+
+    private void StartAgent()
     {
+        if (hasStarted)
+        {
+            return;
+
+        }
+        hasStarted = true;
+
         StartCoroutine(PlayStartupSequence());
     }
+
+
 
     private void Update()
     {

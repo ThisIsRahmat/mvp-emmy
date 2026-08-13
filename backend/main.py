@@ -7,6 +7,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from backend.services.transcription_service import TranscriptionService
+from backend.services.conversation_service import ConversationService
 from backend.services.llm_service import LLMService
 from backend.services.speech_service import SpeechService
 
@@ -15,6 +16,7 @@ app = FastAPI()
 
 audio_directory = Path("outputs/audio")
 audio_directory.mkdir(parents=True, exist_ok=True)
+transcription_service = TranscriptionService()
 
 app.mount(
     "/audio",
@@ -34,9 +36,8 @@ class AgentSettings(BaseModel):
 # Changes the UI names to actual backend model names
 llm_models = {
     "Gemma 3": "gemma3:4b",
-    "Qwen3": "qwen3:4b",
-    "Devstral": "devstral:latest",
-    "DeepSeek-v4 Flash": "deepseek-v4-flash:latest",
+    "Devstral Small 2": "devstral-small-2",
+    # "DeepSeek-v4 Flash": "deepseek-v4-flash:latest",
 }
 
 
@@ -49,13 +50,15 @@ tts_models = {
 
 default_settings = AgentSettings(
     agent_type="Peer",
-    llm="Qwen 3",
+    llm="Gemma 3",
     tts="Kokoro",
+    # add a default voice for TTS if needed
+    tts_voice="",
     custom_prompt="",
 )
 
 current_settings = default_settings 
-
+conversation_service = ConversationService()
 
 def build_services(settings: AgentSettings):
     if settings.llm not in llm_models:
@@ -68,6 +71,13 @@ def build_services(settings: AgentSettings):
     speech_service = SpeechService(model=tts_models[settings.tts], voice=settings.tts_voice, output_directory=audio_directory)
 
     return llm_service, speech_service
+
+# Initialize default services so endpoints work before a /settings call
+try:
+    llm_service, speech_service = build_services(current_settings)
+except Exception:
+    llm_service = None
+    speech_service = None
 
 @app.get("/health")
 def health():
@@ -82,14 +92,17 @@ def update_settings(settings: AgentSettings):
     global current_settings
     global llm_service
     global speech_service
-
     try:
+        # build and assign backend services for the selected models
+        llm_service, speech_service = build_services(settings)
+
         current_settings = settings
+
         conversation_service.start_session(
             agent_type=settings.agent_type,
             llm=settings.llm,
             tts=settings.tts,
-            stt=settings.stt,
+            voice=settings.tts_voice,
         )
 
         return {

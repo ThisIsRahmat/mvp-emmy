@@ -4,7 +4,7 @@ from backend.models.api_models import PromptResponse
 
 class LLMService:
     def __init__(self,
-     model: str = "qwen3:4b", 
+     model: str = "gemma3:4b", 
      agent_type: str = "Peer",
      custom_prompt: str = ""):
         self.model = model
@@ -24,7 +24,7 @@ class LLMService:
 
         if self.agent_type == "Peer":
          return """
-            You are an AI peer-programming companion.
+            You are an AI pair-programming companion.
 
             Collaborate with the developer as a teammate.
             Discuss ideas, trade-offs and implementation choices.
@@ -40,12 +40,13 @@ class LLMService:
         return "You are a helpful AI coding companion."
 
     def generate_response(self, prompt: str) -> PromptResponse:
+
         response = chat(
             model=self.model,
             messages=[
                 {
                     "role": "system",
-                    "content": self.get_system_promptH,
+                    "content": self.get_system_prompt(),
                 },
                 {
                     "role": "user",

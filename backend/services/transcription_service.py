@@ -1,4 +1,4 @@
-
+import whisper
 
 class TranscriptionService:
     def __init__(
