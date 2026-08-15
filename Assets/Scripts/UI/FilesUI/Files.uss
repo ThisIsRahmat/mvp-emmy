@@ -1,0 +1,185 @@
+.files-root {
+    flex-grow: 1;
+
+    justify-content: flex-end;
+    align-items: flex-start;
+
+    padding-left: 20px;
+    padding-bottom: 20px;
+}
+
+
+.files-window {
+    display: none;
+
+    position: absolute;
+    left: 20px;
+    top: 80px;
+
+    width: 360px;
+    height: 380px;
+
+    flex-grow: 0;
+    flex-shrink: 0;
+
+    padding: 12px;
+
+    background-color: rgb(240, 240, 240);
+    border-radius: 10px;
+}
+
+
+.files-icon-button {
+    display: flex;
+
+    position: absolute;
+    left: 20px;
+    top: 20px;
+
+    width: 42px;
+    height: 42px;
+
+    font-size: 20px;
+    border-radius: 21px;
+}
+
+
+.files-header {
+    flex-direction: row;
+    align-items: center;
+
+    margin-bottom: 4px;
+}
+
+
+.files-title {
+    flex-grow: 1;
+
+    font-size: 18px;
+    -unity-font-style: bold;
+}
+
+
+.selected-count {
+    font-size: 11px;
+}
+
+
+.files-description {
+    font-size: 12px;
+
+    margin-bottom: 14px;
+}
+
+
+.files-scroll {
+    flex-grow: 1;
+    min-height: 0;
+}
+
+
+.empty-files-label {
+    margin-top: 20px;
+
+    -unity-text-align: middle-center;
+}
+
+
+/* Dynamically-created file row */
+
+.file-row {
+    height: 42px;
+
+    flex-direction: row;
+    align-items: center;
+
+    margin-bottom: 6px;
+
+    padding-left: 8px;
+    padding-right: 8px;
+
+    background-color: rgb(225, 225, 225);
+
+    border-radius: 6px;
+}
+
+
+.file-toggle {
+    width: 25px;
+}
+
+
+.file-name {
+    flex-grow: 1;
+
+    font-size: 12px;
+}
+
+
+.file-status {
+    font-size: 10px;
+
+    margin-right: 8px;
+
+    padding-left: 6px;
+    padding-right: 6px;
+}
+
+
+.view-button {
+    width: 55px;
+    height: 28px;
+}
+
+
+
+/* Code viewer */
+
+.code-viewer {
+    display: none;
+
+    position: absolute;
+    left: 420px;
+    top: 80px;
+
+    width: 560px;
+    height: 600px;
+
+    flex-grow: 0;
+    flex-shrink: 0;
+
+    padding: 14px;
+
+    background-color: rgb(245, 245, 245);
+    border-radius: 10px;
+}
+
+
+.code-header {
+    flex-direction: row;
+    align-items: center;
+
+    height: 36px;
+
+    margin-bottom: 8px;
+}
+
+.code-title {
+    flex-grow: 1;
+
+    font-size: 15px;
+    -unity-font-style: bold;
+}
+
+
+.close-code-button {
+    width: 30px;
+    height: 30px;
+}
+
+
+.code-text {
+    flex-grow: 1;
+
+    font-size: 11px;
+}

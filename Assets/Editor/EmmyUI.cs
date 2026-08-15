@@ -68,6 +68,21 @@ public class EmmyUI : MonoBehaviour
         {
             settingsWrenchButton.style.display = DisplayStyle.None;
             settingsWrenchButton.clicked += ToggleSettings;
+
+            settingsWindow = root.Q<VisualElement>("settings-window");
+settingsWrenchButton = root.Q<Button>("settings-wrench-button");
+
+Debug.Log($"settingsWindow found: {settingsWindow != null}");
+Debug.Log($"settingsWrenchButton found: {settingsWrenchButton != null}");
+
+if (settingsWrenchButton != null)
+{
+    settingsWrenchButton.style.display = DisplayStyle.None;
+    settingsWrenchButton.clicked += ToggleSettings;
+}
+
+            
+
         }
 
         // Find controls from UXML
@@ -125,6 +140,7 @@ public class EmmyUI : MonoBehaviour
         saveSettingsButton.clicked +=
             HandleSaveSettings;
     }
+
 
     private void ConfigureAgentTypeDropdown()
     {

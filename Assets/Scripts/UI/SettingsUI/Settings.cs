@@ -1,28 +1,28 @@
 using System.Collections.Generic;
 using System.Threading.Tasks;
-using UnityEditor;
 using UnityEngine;
 using UnityEngine.Networking;
 using UnityEngine.UIElements;
 
-public class EmmyUI : MonoBehaviour
+public class Settings : MonoBehaviour
 {
-    [SerializeField]
-    private VisualTreeAsset m_VisualTreeAsset = default;
-
     private DropdownField agentTypeDropdown;
     private DropdownField LLMDropdown;
     private DropdownField TTSDropdown;
     private DropdownField ttsVoiceDropdown;
 
     private TextField customPromptField;
-
     private Button saveSettingsButton;
 
     private UIDocument uiDocument;
 
+    private VisualElement settingsWindow;
+    private Button settingsWrenchButton;
+    [SerializeField]
+    private ConversationController conversationController;
 
-    private readonly Dictionary<string, List<string>> ttsVoiceOptions = new()
+    private readonly Dictionary<string, List<string>>
+        ttsVoiceOptions = new()
     {
         {
             "Kokoro",
@@ -45,65 +45,74 @@ public class EmmyUI : MonoBehaviour
         }
     };
 
-    [MenuItem("Window/UI Toolkit/Emmy")]
-    public static void ShowExample()
+    private void OnEnable()
     {
-        Emmy window = GetWindow<Emmy>();
-        window.titleContent = new GUIContent("Emmy");
-    }
+        uiDocument = GetComponent<UIDocument>();
 
-    public void CreateGUI()
-    {
-        if (m_VisualTreeAsset == null)
+        if (uiDocument == null)
         {
             Debug.LogError(
-                "Emmy: No VisualTreeAsset has been assigned."
+                "SettingsUI requires a UIDocument component."
             );
 
             return;
         }
 
-        VisualElement ui =
-            m_VisualTreeAsset.Instantiate();
+        VisualElement root =
+            uiDocument.rootVisualElement;
 
-        rootVisualElement.Add(ui);
+        // Configure optional settings window and wrench button (if present)
+        settingsWindow = root.Q<VisualElement>("settings-window");
+        settingsWrenchButton = root.Q<Button>("settings-wrench-button");
+        if (settingsWrenchButton != null)
+        {
+            settingsWrenchButton.style.display = DisplayStyle.None;
+            settingsWrenchButton.clicked += ToggleSettings;
 
-        conversationScroll = rootVisualElement.Q<ScrollView>("conversation-scroll");
+            settingsWindow = root.Q<VisualElement>("settings-window");
+settingsWrenchButton = root.Q<Button>("settings-wrench-button");
 
+if (settingsWrenchButton != null)
+{
+    settingsWrenchButton.style.display = DisplayStyle.None;
+    settingsWrenchButton.clicked += ToggleSettings;
+}
+
+            
+
+        }
 
         // Find controls from UXML
         agentTypeDropdown =
-            rootVisualElement.Q<DropdownField>(
+            root.Q<DropdownField>(
                 "agent-type-dropdown"
             );
 
         LLMDropdown =
-            rootVisualElement.Q<DropdownField>(
+            root.Q<DropdownField>(
                 "llm-dropdown"
             );
 
         TTSDropdown =
-            rootVisualElement.Q<DropdownField>(
+            root.Q<DropdownField>(
                 "tts-dropdown"
             );
 
         ttsVoiceDropdown =
-            rootVisualElement.Q<DropdownField>(
+            root.Q<DropdownField>(
                 "tts-voice-dropdown"
             );
 
-
         customPromptField =
-            rootVisualElement.Q<TextField>(
+            root.Q<TextField>(
                 "custom-prompt-field"
             );
 
         saveSettingsButton =
-            rootVisualElement.Q<Button>(
+            root.Q<Button>(
                 "save-settings-button"
             );
 
-        // Validate
         if (
             agentTypeDropdown == null ||
             LLMDropdown == null ||
@@ -115,7 +124,7 @@ public class EmmyUI : MonoBehaviour
         {
             Debug.LogError(
                 "One or more Emmy UI controls could not be found. " +
-                "Check the names in Emmy.uxml."
+                "Check the element names in Emmy.uxml."
             );
 
             return;
@@ -125,9 +134,10 @@ public class EmmyUI : MonoBehaviour
         ConfigureLLMDropdown();
         ConfigureTTSDropdown();
 
-
-        saveSettingsButton.clicked += HandleSaveSettings;
+        saveSettingsButton.clicked +=
+            HandleSaveSettings;
     }
+
 
     private void ConfigureAgentTypeDropdown()
     {
@@ -141,7 +151,8 @@ public class EmmyUI : MonoBehaviour
 
         agentTypeDropdown.value = "Peer";
 
-        customPromptField.value = string.Empty;
+        customPromptField.value =
+            string.Empty;
 
         customPromptField.style.display =
             DisplayStyle.None;
@@ -173,9 +184,6 @@ public class EmmyUI : MonoBehaviour
                 "Piper"
             };
 
-        ttsVoiceDropdown.style.display =
-            DisplayStyle.None;
-
         TTSDropdown.RegisterValueChangedCallback(
             HandleTTSChanged
         );
@@ -184,8 +192,6 @@ public class EmmyUI : MonoBehaviour
 
         PopulateTTSVoices("Kokoro");
     }
-
-
 
     private void HandleAgentTypeChanged(
         ChangeEvent<string> changeEvent
@@ -239,7 +245,8 @@ public class EmmyUI : MonoBehaviour
             return;
         }
 
-        ttsVoiceDropdown.choices = voices;
+        ttsVoiceDropdown.choices =
+            voices;
 
         ttsVoiceDropdown.value =
             voices[0];
@@ -262,7 +269,6 @@ public class EmmyUI : MonoBehaviour
         string selectedTTSVoice =
             ttsVoiceDropdown.value;
 
-
         string customPrompt =
             selectedAgentType == "Other"
                 ? customPromptField.value.Trim()
@@ -276,11 +282,18 @@ public class EmmyUI : MonoBehaviour
 
         if (string.IsNullOrWhiteSpace(selectedTTS))
         {
-            Debug.LogError("Select a TTS model.");
+            Debug.LogError(
+                "Select a TTS model."
+            );
+
             return;
         }
 
-        if (string.IsNullOrWhiteSpace(selectedTTSVoice))
+        if (
+            string.IsNullOrWhiteSpace(
+                selectedTTSVoice
+            )
+        )
         {
             Debug.LogError(
                 "Select a voice for the selected TTS model."
@@ -289,10 +302,11 @@ public class EmmyUI : MonoBehaviour
             return;
         }
 
-
         if (
             selectedAgentType == "Other" &&
-            string.IsNullOrWhiteSpace(customPrompt)
+            string.IsNullOrWhiteSpace(
+                customPrompt
+            )
         )
         {
             Debug.LogError(
@@ -323,7 +337,9 @@ public class EmmyUI : MonoBehaviour
             JsonUtility.ToJson(settings);
 
         byte[] bodyRaw =
-            System.Text.Encoding.UTF8.GetBytes(json);
+            System.Text.Encoding.UTF8.GetBytes(
+                json
+            );
 
         using UnityWebRequest request =
             new UnityWebRequest(
@@ -343,7 +359,9 @@ public class EmmyUI : MonoBehaviour
         );
 
         saveSettingsButton.SetEnabled(false);
-        saveSettingsButton.text = "Starting...";
+
+        saveSettingsButton.text =
+            "Starting...";
 
         UnityWebRequestAsyncOperation operation =
             request.SendWebRequest();
@@ -364,8 +382,12 @@ public class EmmyUI : MonoBehaviour
                 $"{request.downloadHandler.text}"
             );
 
-            saveSettingsButton.SetEnabled(true);
-            saveSettingsButton.text = "Start";
+            saveSettingsButton.SetEnabled(
+                true
+            );
+
+            saveSettingsButton.text =
+                "Start";
 
             return;
         }
@@ -375,18 +397,44 @@ public class EmmyUI : MonoBehaviour
             $"LLM: {settings.llm}\n" +
             $"TTS: {settings.tts} " +
             $"({settings.tts_voice})\n" +
-            $"Agent Type: {settings.agent_type}"
+            $"Agent Type: " +
+            $"{settings.agent_type}"
         );
 
-        saveSettingsButton.text = "Started";
+        saveSettingsButton.text =
+            "Started";
 
-        Debug.Log("Settings saved. Starting Emmy...");
+                Debug.Log(
+            "Settings saved. Starting Emmy..."
+        );
 
-        if (!EditorApplication.isPlaying)
+        settingsWindow.style.display =
+            DisplayStyle.None;
+
+        settingsWrenchButton.style.display =
+            DisplayStyle.Flex;
+
+        if (conversationController != null)
         {
-            EditorApplication.isPlaying = true;
+            conversationController.StartAgent();
+        }
+        else
+        {
+            Debug.LogError("ConversationController is not assigned.");
         }
     }
+
+    private void ToggleSettings()
+{
+    bool isVisible =
+        settingsWindow.style.display !=
+        DisplayStyle.None;
+
+    settingsWindow.style.display =
+        isVisible
+            ? DisplayStyle.None
+            : DisplayStyle.Flex;
+}
 
     private void OnDisable()
     {
@@ -395,8 +443,25 @@ public class EmmyUI : MonoBehaviour
             saveSettingsButton.clicked -=
                 HandleSaveSettings;
         }
+
+        if (agentTypeDropdown != null)
+        {
+            agentTypeDropdown
+                .UnregisterValueChangedCallback(
+                    HandleAgentTypeChanged
+                );
+        }
+
+        if (TTSDropdown != null)
+        {
+            TTSDropdown
+                .UnregisterValueChangedCallback(
+                    HandleTTSChanged
+                );
+        }
     }
 }
+
 
 [System.Serializable]
 public class AgentSettings

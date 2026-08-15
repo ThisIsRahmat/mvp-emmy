@@ -62,7 +62,7 @@ public class ConversationController : MonoBehaviour
 
     private bool hasStarted = false;
 
-    private void StartAgent()
+    public void StartAgent()
     {
         if (hasStarted)
         {

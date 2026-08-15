@@ -1,0 +1,93 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements">
+
+    <Style src="Files.uss" />
+
+  <ui:VisualElement
+    class="files-root"
+    picking-mode="Ignore"
+>
+
+        <ui:VisualElement
+            name="files-window"
+            class="files-window"
+        >
+
+            <ui:VisualElement class="files-header">
+
+                <ui:Label
+                    text="Project Files"
+                    class="files-title"
+                />
+
+                <ui:Button
+                    name="close-files-button"
+                    text="×"
+                    class="close-files-button"
+                />
+
+            </ui:VisualElement>
+
+            <ui:Label
+                text="Select files to give Emmy as context."
+                class="files-description"
+            />
+
+            <ui:ScrollView
+                name="files-scroll"
+                class="files-scroll"
+                mode="Vertical"
+            >
+
+              <ui:Label
+    name="empty-files-label"
+    text="No project files loaded."
+    class="empty-files-label"
+    picking-mode="Ignore"
+/>
+
+            </ui:ScrollView>
+
+        </ui:VisualElement>
+
+
+  <ui:Button
+    name="open-files-button"
+    text="📁"
+    class="files-icon-button"
+    picking-mode="Position"
+/>
+
+
+        <ui:VisualElement
+            name="code-viewer"
+            class="code-viewer"
+        >
+
+            <ui:VisualElement class="code-header">
+
+                <ui:Label
+                    name="code-title"
+                    text="File.cs"
+                    class="code-title"
+                />
+
+                <ui:Button
+                    name="close-code-button"
+                    text="×"
+                    class="close-code-button"
+                />
+
+            </ui:VisualElement>
+
+            <ui:TextField
+                name="code-text"
+                multiline="true"
+                is-read-only="true"
+                class="code-text"
+            />
+
+        </ui:VisualElement>
+
+    </ui:VisualElement>
+
+</ui:UXML>

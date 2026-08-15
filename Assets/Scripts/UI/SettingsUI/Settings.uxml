@@ -2,23 +2,27 @@
     xmlns:ui="UnityEngine.UIElements"
 >
 
-    <Style src="Emmy.uss" />
+    <Style src="Settings.uss" />
 
-    <ui:VisualElement class="screen-root">
+    <ui:VisualElement class="screen-root" picking-mode="Ignore">
 
-        <ui:VisualElement class="emmy-window">
+        <ui:VisualElement
+            name="settings-window"
+            class="emmy-window"
+        >
 
             <ui:TabView
+                name="emmy-tab-view"
                 reorderable="false"
                 class="emmy-tabs"
             >
 
                 <ui:Tab label="Settings">
 
-                     <ui:ScrollView
-        class="settings-scroll"
-        mode="Vertical"
-    >
+                    <ui:ScrollView
+                        class="settings-scroll"
+                        mode="Vertical"
+                    >
 
                         <ui:VisualElement class="settings-panel">
 
@@ -43,7 +47,6 @@
                                 />
 
                             </ui:VisualElement>
-
 
                             <ui:VisualElement class="settings-section">
 
@@ -72,7 +75,6 @@
 
                             </ui:VisualElement>
 
-
                             <ui:Button
                                 text="Start"
                                 name="save-settings-button"
@@ -84,7 +86,6 @@
                     </ui:ScrollView>
 
                 </ui:Tab>
-
 
                 <ui:Tab label="Conversation History">
 
@@ -99,12 +100,14 @@
 
         </ui:VisualElement>
 
-   <ui:Button
-        name="settings-wrench-button"
-        text="⚙"
-        class="settings-wrench"
-    />
+        <ui:Button
+            name="settings-wrench-button"
+            text="⚙"
+            class="settings-wrench"
+        />
+
     
+
     </ui:VisualElement>
 
 </ui:UXML>
