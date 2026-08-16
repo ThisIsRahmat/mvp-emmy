@@ -8,6 +8,10 @@ using UnityEngine.Networking;
 
 public class ConversationController : MonoBehaviour
 {
+
+    [SerializeField]
+    private Files files; 
+
     [Header("Backend")]
     [SerializeField]
     private string backendBaseUrl = "http://127.0.0.1:8000";
@@ -71,7 +75,9 @@ public class ConversationController : MonoBehaviour
         }
         hasStarted = true;
 
-        StartCoroutine(PlayStartupSequence());
+         StartCoroutine(
+        PlayStartupSequence()
+    );
     }
 
 
@@ -396,6 +402,7 @@ private IEnumerator RequestGreeting(
 
     private IEnumerator ProcessConversation(string recordingPath)
     {
+      
         isBusy = true;
         SetState(AgentState.Thinking);
 
@@ -543,6 +550,11 @@ private IEnumerator RequestGreeting(
         {
             activeConversationCoroutine = null;
             yield break;
+        }
+
+        if (files != null)
+        {
+            files.RefreshFiles();
         }
 
         isBusy = false;

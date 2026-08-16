@@ -29,7 +29,7 @@
                             <ui:VisualElement class="settings-section">
 
                                 <ui:Label
-                                    text="Agent Characteristics"
+                                    text="Personalise Agent"
                                     class="section-title"
                                 />
 
@@ -50,25 +50,11 @@
 
                             <ui:VisualElement class="settings-section">
 
-                                <ui:Label
-                                    text="Select Models"
-                                    class="section-title"
-                                />
+    
+
 
                                 <ui:DropdownField
-                                    label="Large Language Model"
-                                    name="llm-dropdown"
-                                    class="settings-field"
-                                />
-
-                                <ui:DropdownField
-                                    label="Text-to-Speech Model"
-                                    name="tts-dropdown"
-                                    class="settings-field"
-                                />
-
-                                <ui:DropdownField
-                                    label="Voice"
+                                    label="Agent Voice"
                                     name="tts-voice-dropdown"
                                     class="settings-field"
                                 />

@@ -1,8 +1,10 @@
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UIElements;
+using System.Collections;
+using UnityEngine.Networking;
 
-public class FilesUI : MonoBehaviour
+public class Files : MonoBehaviour
 {
     private ScrollView filesScroll;
     private Label emptyFilesLabel;
@@ -24,6 +26,10 @@ public class FilesUI : MonoBehaviour
 
     private readonly HashSet<string> selectedFiles =
         new HashSet<string>();
+
+    [SerializeField]
+    private string backendBaseUrl =
+        "http://127.0.0.1:8000";
 
 
     private void OnEnable()
@@ -176,32 +182,15 @@ public class FilesUI : MonoBehaviour
         );
 
 
-        // Temporary test files.
-        // AddTestFile(
-        //     "BallController.cs"
-        // );
+        StartCoroutine(
+    LoadFilesFromBackend()
+);
 
-        // AddTestFile(
-        //     "PaddleController.cs"
-        // );
 
-        // AddTestFile(
-        //     "GameManager.cs"
-        // );
 
-//         AddTestFile("BallController.cs");
-// AddTestFile("PaddleController.cs");
-// AddTestFile("GameManager.cs");
-// AddTestFile("BrickController.cs");
-// AddTestFile("ScoreManager.cs");
-// AddTestFile("LevelManager.cs");
-// AddTestFile("AudioManager.cs");
-// AddTestFile("PowerUp.cs");
-// AddTestFile("CollisionHandler.cs");
-// AddTestFile("UIManager.cs");
-// AddTestFile("InputManager.cs");
-// AddTestFile("LivesManager.cs");
     }
+
+
 
 
     private void OpenFiles()
@@ -266,10 +255,131 @@ public class FilesUI : MonoBehaviour
             DisplayStyle.Flex;
     }
 
+    /// load files from backend
+    private IEnumerator LoadFilesFromBackend()
+        
+    {
+        string url =
+            $"{backendBaseUrl}/files";
 
-    // ----------------------------
+        using UnityWebRequest request =
+            UnityWebRequest.Get(url);
+
+        yield return request.SendWebRequest();
+
+        if (
+            request.result !=
+            UnityWebRequest.Result.Success
+        )
+        {
+            Debug.LogError(
+                $"Could not load files: " +
+                $"{request.error}\n" +
+                $"{request.downloadHandler.text}"
+            );
+
+            yield break;
+        }
+
+        FileListResponse response =
+            JsonUtility.FromJson<FileListResponse>(
+                request.downloadHandler.text
+            );
+
+        filesScroll.Clear();
+
+        if (
+            response == null ||
+            response.files == null ||
+            response.files.Length == 0
+        )
+        {
+            if (emptyFilesLabel != null)
+            {
+                emptyFilesLabel.style.display =
+                    DisplayStyle.Flex;
+            }
+
+            yield break;
+        }
+
+        if (emptyFilesLabel != null)
+        {
+            emptyFilesLabel.style.display =
+                DisplayStyle.None;
+        }
+
+        foreach (
+            ProjectFile file in response.files
+        )
+        {
+            AddFileRow(
+                file.name,
+                file.path
+            );
+        }
+    }
+
+    // add file content 
+
+    private IEnumerator LoadFileContent(
+    string fileName,
+    string filePath
+    )
+    {
+        string encodedPath =
+            UnityWebRequest.EscapeURL(
+                filePath
+            );
+
+        string url =
+            $"{backendBaseUrl}/files/content" +
+            $"?path={encodedPath}";
+
+        using UnityWebRequest request =
+            UnityWebRequest.Get(url);
+
+        yield return request.SendWebRequest();
+
+        if (
+            request.result !=
+            UnityWebRequest.Result.Success
+        )
+        {
+            Debug.LogError(
+                $"Could not load file content: " +
+                $"{request.error}\n" +
+                $"{request.downloadHandler.text}"
+            );
+
+            yield break;
+        }
+
+        FileContentResponse response =
+            JsonUtility.FromJson<FileContentResponse>(
+                request.downloadHandler.text
+            );
+
+        codeTitle.text =
+            fileName;
+
+        codeText.value =
+            response.content;
+
+        filesWindow.style.display =
+            DisplayStyle.Flex;
+
+        codeViewer.style.display =
+            DisplayStyle.Flex;
+
+        openFilesButton.style.display =
+            DisplayStyle.None;
+    }
+
+
+    
     // CODE VIEWER DRAGGING
-    // ----------------------------
+   
 
     private void OnCodeHeaderPointerDown(
         PointerDownEvent evt
@@ -384,8 +494,9 @@ Vector2 delta =
     // FILE ROWS
     // ----------------------------
 
-    private void AddTestFile(
-        string fileName
+    private void AddFileRow(
+    string fileName,
+    string filePath
     )
     {
         if (emptyFilesLabel != null)
@@ -430,11 +541,17 @@ Vector2 delta =
 
 
         Button viewButton =
-            new Button(
-                () => OpenCodeViewer(
-                    fileName
-                )
-            );
+        new Button(
+            () =>
+            {
+                StartCoroutine(
+                    LoadFileContent(
+                        fileName,
+                        filePath
+                    )
+                );
+            }
+        );
 
         viewButton.text =
             "View";
@@ -450,13 +567,13 @@ Vector2 delta =
                 if (evt.newValue)
                 {
                     selectedFiles.Add(
-                        fileName
+                         filePath
                     );
                 }
                 else
                 {
                     selectedFiles.Remove(
-                        fileName
+                         filePath
                     );
                 }
 
@@ -483,6 +600,14 @@ Vector2 delta =
             selectedFiles
         );
     }
+
+    public void RefreshFiles()
+    {
+        StartCoroutine(
+            LoadFilesFromBackend()
+        );
+    }
+
 
 
     private void OnDisable()
@@ -537,5 +662,28 @@ Vector2 delta =
                 OnCodeHeaderPointerCaptureOut
             );
         }
+
+
     }
+
+}
+
+[System.Serializable]
+public class FileListResponse
+{
+    public ProjectFile[] files;
+}
+
+[System.Serializable]
+public class ProjectFile
+{
+    public string name;
+    public string path;
+}
+
+[System.Serializable]
+public class FileContentResponse
+{
+    public string path;
+    public string content;
 }

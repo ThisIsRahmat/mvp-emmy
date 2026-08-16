@@ -1,8 +1,11 @@
+import json
+import time
 from pathlib import Path
 from shutil import copyfileobj
 from tempfile import NamedTemporaryFile
+from tkinter.tix import Form
 
-from fastapi import FastAPI, File, HTTPException, UploadFile
+from fastapi import FastAPI, File, HTTPException, UploadFile, Form
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
@@ -10,6 +13,7 @@ from backend.services.transcription_service import TranscriptionService
 from backend.services.conversation_service import ConversationService
 from backend.services.llm_service import LLMService
 from backend.services.speech_service import SpeechService
+from backend.tools.file_tools import FileTools
 
 
 app = FastAPI()
@@ -17,6 +21,7 @@ app = FastAPI()
 audio_directory = Path("outputs/audio")
 audio_directory.mkdir(parents=True, exist_ok=True)
 transcription_service = TranscriptionService()
+file_tools = FileTools(project_root="../Assets/Scripts")
 
 app.mount(
     "/audio",
@@ -27,7 +32,6 @@ app.mount(
 
 class AgentSettings(BaseModel):
     agent_type: str
-    llm: str
     tts: str
     tts_voice: str = ""
     custom_prompt: str = ""
@@ -37,7 +41,6 @@ class AgentSettings(BaseModel):
 llm_models = {
     "Gemma 3": "gemma3:4b",
     "Devstral Small 2": "devstral-small-2",
-    # "DeepSeek-v4 Flash": "deepseek-v4-flash:latest",
 }
 
 
@@ -61,14 +64,9 @@ current_settings = default_settings
 conversation_service = ConversationService()
 
 def build_services(settings: AgentSettings):
-    if settings.llm not in llm_models:
-        raise ValueError(f"Unsupported LLM selection: {settings.llm}")
-    if settings.tts not in tts_models:
-        raise ValueError(f"Unsupported TTS selection: {settings.tts}")
 
-
-    llm_service = LLMService(model=llm_models[settings.llm], agent_type=settings.agent_type, custom_prompt=settings.custom_prompt)
-    speech_service = SpeechService(model=tts_models[settings.tts], voice=settings.tts_voice, output_directory=audio_directory)
+    llm_service = LLMService(agent_type=settings.agent_type, custom_prompt=settings.custom_prompt)
+    speech_service = SpeechService( voice=settings.tts_voice, output_directory=audio_directory)
 
     return llm_service, speech_service
 
@@ -100,9 +98,7 @@ def update_settings(settings: AgentSettings):
 
         conversation_service.start_session(
             agent_type=settings.agent_type,
-            llm=settings.llm,
-            tts=settings.tts,
-            voice=settings.tts_voice,
+            tts_voice=settings.tts_voice,
         )
 
         return {
@@ -136,77 +132,107 @@ def agent_greeting():
         "audio_url": f"/audio/{relative_path.as_posix()}",
     }
 
+# Define once, near your other module-level setup (audio_directory etc.), not inside the endpoint
+# file_tools = FileTools(project_root="/absolute/path/to/your/UnityProject/Assets/Scripts")
+
+
 @app.post("/agent/respond")
-def agent_respond(
-    audio: UploadFile = File(...)
-):
+def agent_respond(audio: UploadFile = File(...),  
+                  selected_files: str = Form("[]"),):
     temporary_path = None
 
+    file_paths = json.loads(
+    selected_files
+    )
+
+    file_contents = file_tools.read_files(
+        file_paths
+    )
+
     try:
-        with NamedTemporaryFile(
-            suffix=".wav",
-            delete=False,
-        ) as temp_file:
+        with NamedTemporaryFile(suffix=".wav", delete=False) as temp_file:
+            copyfileobj(audio.file, temp_file)
+            temporary_path = Path(temp_file.name)
 
-            copyfileobj(
-                audio.file,
-                temp_file,
-            )
+   
 
-            temporary_path = Path(
-                temp_file.name
-            )
+        t0 = time.time()
 
-        transcription = (
-            transcription_service.transcribe_audio(
-                temporary_path
-            )
+
+        transcription = transcription_service.transcribe_audio(temporary_path)
+
+        # Snapshot history BEFORE adding the new user message
+        history_for_llm = (
+            conversation_service.current_session.messages
+            if conversation_service.current_session else []
         )
 
-        llm_result = (
-            llm_service.generate_response(
-                transcription
+        conversation_service.add_user_message(transcription)
+
+        t1 = time.time()
+
+        # Send prompt + selected files to LLM
+
+        llm_result = llm_service.generate_response(
+            prompt=transcription,
+            files=file_contents,
+            history=history_for_llm,
+        )
+
+        conversation_service.add_agent_message(llm_result.response_speech)
+
+        t2 = time.time()
+
+        audio_path = speech_service.generate_speech(llm_result.response_speech)
+        relative_path = audio_path.relative_to(audio_directory)
+
+        t3 = time.time()
+
+        print(f"STT: {t1-t0:.1f}s | LLM: {t2-t1:.1f}s | TTS: {t3-t2:.1f}s")
+
+
+
+
+        # Only attempt a file write if the model actually returned file info
+        file_result = None
+        if llm_result.response_code and getattr(llm_result, "file_path", None):
+            file_result = file_tools.write_file(
+                llm_result.file_path,
+                llm_result.response_code,
             )
-        )
-
-        conversation_service.add_agent_message(
-            llm_result.response_speech
-        )
-
-        audio_path = (
-            speech_service.generate_speech(
-                llm_result.response_speech
-            )
-        )
-
-        relative_path = audio_path.relative_to(
-            audio_directory
-        )
 
         return {
             "transcription": transcription,
             "response_speech": llm_result.response_speech,
             "response_code": llm_result.response_code,
-            "audio_url": (
-                f"/audio/{relative_path.as_posix()}"
-            ),
+            "audio_url": f"/audio/{relative_path.as_posix()}",
+            "file_status": file_result["status"] if file_result else None,
+            "file_path": file_result["path"] if file_result else None,
         }
 
     except Exception as error:
-        raise HTTPException(
-            status_code=500,
-            detail=str(error),
-        ) from error
+        raise HTTPException(status_code=500, detail=str(error)) from error
 
     finally:
         audio.file.close()
-
-        if (
-            temporary_path
-            and temporary_path.exists()
-        ):
+        if temporary_path and temporary_path.exists():
             temporary_path.unlink()
 
+@app.get("/files")
+def list_files():
+    return {
+        "files": file_tools.list_files()
+    }
+
+@app.get("/files/content")
+def get_file_content(path: str):
+    content = file_tools.read_file(path)
+
+    return {
+        "path": path,
+        "content": content,
+    }
+    
 @app.get("/conversation")
 def get_conversation():
     if conversation_service.current_session is None:

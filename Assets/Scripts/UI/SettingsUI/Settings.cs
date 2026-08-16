@@ -7,8 +7,7 @@ using UnityEngine.UIElements;
 public class Settings : MonoBehaviour
 {
     private DropdownField agentTypeDropdown;
-    private DropdownField LLMDropdown;
-    private DropdownField TTSDropdown;
+    // TTS model selection removed; we default to a single TTS provider and expose only voices
     private DropdownField ttsVoiceDropdown;
 
     private TextField customPromptField;
@@ -88,20 +87,13 @@ if (settingsWrenchButton != null)
                 "agent-type-dropdown"
             );
 
-        LLMDropdown =
-            root.Q<DropdownField>(
-                "llm-dropdown"
-            );
-
-        TTSDropdown =
-            root.Q<DropdownField>(
-                "tts-dropdown"
-            );
-
         ttsVoiceDropdown =
             root.Q<DropdownField>(
                 "tts-voice-dropdown"
             );
+
+        // Populate voices for the single supported TTS provider (default: Kokoro)
+        PopulateTTSVoices("Kokoro");
 
         customPromptField =
             root.Q<TextField>(
@@ -115,8 +107,6 @@ if (settingsWrenchButton != null)
 
         if (
             agentTypeDropdown == null ||
-            LLMDropdown == null ||
-            TTSDropdown == null ||
             ttsVoiceDropdown == null ||
             customPromptField == null ||
             saveSettingsButton == null
@@ -131,8 +121,6 @@ if (settingsWrenchButton != null)
         }
 
         ConfigureAgentTypeDropdown();
-        ConfigureLLMDropdown();
-        ConfigureTTSDropdown();
 
         saveSettingsButton.clicked +=
             HandleSaveSettings;
@@ -162,36 +150,9 @@ if (settingsWrenchButton != null)
         );
     }
 
-    private void ConfigureLLMDropdown()
-    {
-        LLMDropdown.choices =
-            new List<string>
-            {
-                "Qwen3",
-                "Gemma 3",
-                "Devstral"
-            };
 
-        LLMDropdown.value = "Qwen3";
-    }
-
-    private void ConfigureTTSDropdown()
-    {
-        TTSDropdown.choices =
-            new List<string>
-            {
-                "Kokoro",
-                "Piper"
-            };
-
-        TTSDropdown.RegisterValueChangedCallback(
-            HandleTTSChanged
-        );
-
-        TTSDropdown.value = "Kokoro";
-
-        PopulateTTSVoices("Kokoro");
-    }
+    // TTS model selection removed: voices are populated directly for the single provider.
+    // No TTSDropdown to unregister (single TTS provider)
 
     private void HandleAgentTypeChanged(
         ChangeEvent<string> changeEvent
@@ -212,14 +173,7 @@ if (settingsWrenchButton != null)
         }
     }
 
-    private void HandleTTSChanged(
-        ChangeEvent<string> changeEvent
-    )
-    {
-        PopulateTTSVoices(
-            changeEvent.newValue
-        );
-    }
+    // TTS model selection removed: voices are populated directly for the single provider.
 
     private void PopulateTTSVoices(
         string selectedTTS
@@ -260,11 +214,9 @@ if (settingsWrenchButton != null)
         string selectedAgentType =
             agentTypeDropdown.value;
 
-        string selectedLLM =
-            LLMDropdown.value;
 
-        string selectedTTS =
-            TTSDropdown.value;
+        // TTS model is fixed to Kokoro (only provider exposed)
+        string selectedTTS = "Kokoro";
 
         string selectedTTSVoice =
             ttsVoiceDropdown.value;
@@ -274,11 +226,6 @@ if (settingsWrenchButton != null)
                 ? customPromptField.value.Trim()
                 : string.Empty;
 
-        if (string.IsNullOrWhiteSpace(selectedLLM))
-        {
-            Debug.LogError("Select an LLM.");
-            return;
-        }
 
         if (string.IsNullOrWhiteSpace(selectedTTS))
         {
@@ -320,7 +267,6 @@ if (settingsWrenchButton != null)
             new AgentSettings
             {
                 agent_type = selectedAgentType,
-                llm = selectedLLM,
                 tts = selectedTTS,
                 tts_voice = selectedTTSVoice,
                 custom_prompt = customPrompt
@@ -394,7 +340,6 @@ if (settingsWrenchButton != null)
 
         Debug.Log(
             $"Agent started successfully.\n" +
-            $"LLM: {settings.llm}\n" +
             $"TTS: {settings.tts} " +
             $"({settings.tts_voice})\n" +
             $"Agent Type: " +
@@ -452,13 +397,7 @@ if (settingsWrenchButton != null)
                 );
         }
 
-        if (TTSDropdown != null)
-        {
-            TTSDropdown
-                .UnregisterValueChangedCallback(
-                    HandleTTSChanged
-                );
-        }
+        // No TTSDropdown to unregister (single TTS provider)
     }
 }
 
@@ -467,7 +406,6 @@ if (settingsWrenchButton != null)
 public class AgentSettings
 {
     public string agent_type;
-    public string llm;
     public string tts;
     public string tts_voice;
     public string custom_prompt;

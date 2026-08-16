@@ -13,9 +13,7 @@ class ConversationSession(BaseModel):
     started_at: datetime
 
     agent_type: str
-    llm: str
-    tts: str
-    voice: str
+    tts_voice: str
 
     messages: list[ConversationMessage] = Field(
         default_factory=list
@@ -38,9 +36,7 @@ class ConversationService:
     def start_session(
         self,
         agent_type: str,
-        llm: str,
-        tts: str,
-        voice: str,
+        tts_voice: str,
     ) -> ConversationSession:
 
         session_id = (
@@ -53,9 +49,7 @@ class ConversationService:
             session_id=session_id,
             started_at=datetime.now(),
             agent_type=agent_type,
-            llm=llm,
-            tts=tts,
-            voice=voice,
+            tts_voice=tts_voice,
         )
 
         self.save()
