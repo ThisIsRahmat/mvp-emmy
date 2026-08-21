@@ -10,7 +10,7 @@ class SpeechService:
     def __init__(
         self,
         output_directory: Path | str = "outputs/audio",
-        voice: str = "bf_emma",
+        voice: str = "am_adam",
         speed: float = 1.0,
     ) -> None:
         self.output_directory = Path(output_directory)

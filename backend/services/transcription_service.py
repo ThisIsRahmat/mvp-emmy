@@ -26,7 +26,7 @@ class TranscriptionService:
 
         if self.model == "whisper":
             result = self.client.transcribe(
-                str(audio_path)
+                str(audio_path), fp16=False, language='English'
             )
 
             return result["text"].strip()

@@ -37,17 +37,16 @@ class AgentSettings(BaseModel):
     custom_prompt: str = ""
 
 
-# Changes the UI names to actual backend model names
+# Changed the UI names to actual backend model names
 llm_models = {
     "Gemma 3": "gemma3:4b",
     "Devstral Small 2": "devstral-small-2",
 }
 
 
-tts_models = {
-    "Kokoro": "kokoro",
-    "Piper": "piper"
-}
+# How many past messages to replay to the LLM, roughly five turns.
+# Kept small so the prompt stays cheap for the local model.
+MAX_HISTORY_MESSAGES = 10
 
 
 
@@ -55,7 +54,7 @@ default_settings = AgentSettings(
     agent_type="Peer",
     llm="Gemma 3",
     tts="Kokoro",
-    # add a default voice for TTS if needed
+
     tts_voice="",
     custom_prompt="",
 )
@@ -112,27 +111,9 @@ def update_settings(settings: AgentSettings):
             detail=str(error),
         ) from error
 
-@app.post("/agent/greeting")
-def agent_greeting():
-    greeting_text = (
-        "Hi, I'm your AI companion. "
-        "Hold the space bar when you're ready to talk."
-    )
 
-    audio_path = speech_service.generate_speech(
-        greeting_text
-    )
 
-    relative_path = audio_path.relative_to(
-        audio_directory
-    )
 
-    return {
-        "text": greeting_text,
-        "audio_url": f"/audio/{relative_path.as_posix()}",
-    }
-
-# Define once, near your other module-level setup (audio_directory etc.), not inside the endpoint
 # file_tools = FileTools(project_root="/absolute/path/to/your/UnityProject/Assets/Scripts")
 
 
@@ -163,8 +144,11 @@ def agent_respond(audio: UploadFile = File(...),
 
         # Snapshot history BEFORE adding the new user message
         history_for_llm = (
-            conversation_service.current_session.messages
-            if conversation_service.current_session else []
+            conversation_service.current_session.messages[
+                -MAX_HISTORY_MESSAGES:
+            ]
+            if conversation_service.current_session
+            else []
         )
 
         conversation_service.add_user_message(transcription)
