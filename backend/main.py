@@ -202,6 +202,19 @@ def agent_respond(audio: UploadFile = File(...),
         if temporary_path and temporary_path.exists():
             temporary_path.unlink()
 
+class ImportFileRequest(BaseModel):
+    name: str
+    content: str
+
+
+@app.post("/files/import")
+def import_file(payload: ImportFileRequest):
+    try:
+        return file_tools.write_file(payload.name, payload.content)
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+
+
 @app.get("/files")
 def list_files():
     return {

@@ -28,7 +28,7 @@
             </ui:VisualElement>
 
             <ui:Label
-                text="Select files to give Emmy as context."
+                text="Files Emmy can see. Drag a file onto the folder icon to add more."
                 class="files-description"
             />
 
@@ -55,6 +55,12 @@
     text="📁"
     class="files-icon-button"
     picking-mode="Position"
+/>
+
+  <ui:Label
+    name="drop-toast-label"
+    class="drop-toast-label"
+    picking-mode="Ignore"
 />
 
 

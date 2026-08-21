@@ -12,6 +12,7 @@ public class Files : MonoBehaviour
     private VisualElement filesWindow;
     private Button openFilesButton;
     private Button closeFilesButton;
+    private Label dropToastLabel;
 
     private VisualElement codeViewer;
     private VisualElement codeHeader;
@@ -24,8 +25,10 @@ public class Files : MonoBehaviour
     private Vector2 codeDragStartPointer;
     private Vector2 codeDragStartPosition;
 
-    private readonly HashSet<string> selectedFiles =
-        new HashSet<string>();
+    private Coroutine dropToastCoroutine;
+
+    private readonly List<string> loadedFilePaths =
+        new List<string>();
 
     [SerializeField]
     private string backendBaseUrl =
@@ -75,6 +78,11 @@ public class Files : MonoBehaviour
         closeFilesButton =
             root.Q<Button>(
                 "close-files-button"
+            );
+
+        dropToastLabel =
+            root.Q<Label>(
+                "drop-toast-label"
             );
 
 
@@ -145,6 +153,12 @@ public class Files : MonoBehaviour
 
         openFilesButton.style.display =
             DisplayStyle.Flex;
+
+        if (dropToastLabel != null)
+        {
+            dropToastLabel.style.display =
+                DisplayStyle.None;
+        }
 
 
         // Normal button callbacks.
@@ -287,6 +301,7 @@ public class Files : MonoBehaviour
             );
 
         filesScroll.Clear();
+        loadedFilePaths.Clear();
 
         if (
             response == null ||
@@ -505,19 +520,15 @@ Vector2 delta =
                 DisplayStyle.None;
         }
 
+        loadedFilePaths.Add(
+            filePath
+        );
+
         VisualElement row =
             new VisualElement();
 
         row.AddToClassList(
             "file-row"
-        );
-
-
-        Toggle toggle =
-            new Toggle();
-
-        toggle.AddToClassList(
-            "file-toggle"
         );
 
 
@@ -561,31 +572,6 @@ Vector2 delta =
         );
 
 
-        toggle.RegisterValueChangedCallback(
-            evt =>
-            {
-                if (evt.newValue)
-                {
-                    selectedFiles.Add(
-                         filePath
-                    );
-                }
-                else
-                {
-                    selectedFiles.Remove(
-                         filePath
-                    );
-                }
-
-                Debug.Log(
-                    $"Selected context files: " +
-                    $"{string.Join(", ", selectedFiles)}"
-                );
-            }
-        );
-
-
-        row.Add(toggle);
         row.Add(name);
         row.Add(statusBadge);
         row.Add(viewButton);
@@ -597,7 +583,7 @@ Vector2 delta =
     public List<string> GetSelectedFiles()
     {
         return new List<string>(
-            selectedFiles
+            loadedFilePaths
         );
     }
 
@@ -606,6 +592,44 @@ Vector2 delta =
         StartCoroutine(
             LoadFilesFromBackend()
         );
+    }
+
+    /// <summary>
+    /// Called by FileDropReceiver once a dropped file has been imported
+    /// on the backend. Flashes the filename at the drop-target icon,
+    /// then expands the panel so the new file is visible.
+    /// </summary>
+    public void OnFileImported(string fileName)
+    {
+        if (dropToastCoroutine != null)
+        {
+            StopCoroutine(dropToastCoroutine);
+        }
+
+        dropToastCoroutine = StartCoroutine(
+            ShowDropToastThenExpand(fileName)
+        );
+    }
+
+    private IEnumerator ShowDropToastThenExpand(string fileName)
+    {
+        if (dropToastLabel != null)
+        {
+            dropToastLabel.text = fileName;
+            dropToastLabel.style.display = DisplayStyle.Flex;
+        }
+
+        yield return new WaitForSeconds(1.2f);
+
+        if (dropToastLabel != null)
+        {
+            dropToastLabel.style.display = DisplayStyle.None;
+        }
+
+        OpenFiles();
+        RefreshFiles();
+
+        dropToastCoroutine = null;
     }
 
 

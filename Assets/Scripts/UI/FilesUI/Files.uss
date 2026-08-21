@@ -44,6 +44,27 @@
 }
 
 
+.drop-toast-label {
+    display: none;
+
+    position: absolute;
+    left: 68px;
+    top: 30px;
+
+    max-width: 220px;
+
+    padding: 6px 10px;
+
+    font-size: 12px;
+    color: rgb(255, 255, 255);
+
+    background-color: rgb(40, 40, 40);
+    border-radius: 6px;
+
+    -unity-text-align: middle-left;
+}
+
+
 .files-header {
     flex-direction: row;
     align-items: center;
@@ -101,11 +122,6 @@
     background-color: rgb(225, 225, 225);
 
     border-radius: 6px;
-}
-
-
-.file-toggle {
-    width: 25px;
 }
 
 

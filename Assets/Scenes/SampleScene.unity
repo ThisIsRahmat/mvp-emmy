@@ -130,6 +130,7 @@ GameObject:
   - component: {fileID: 85963911}
   - component: {fileID: 85963910}
   - component: {fileID: 85963912}
+  - component: {fileID: 85963913}
   m_Layer: 0
   m_Name: FilesUI
   m_TagString: Untagged
@@ -188,6 +189,21 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::FilesUI
   backendBaseUrl: http://127.0.0.1:8000
+--- !u!114 &85963913
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 85963909}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 367f2ff69ba394b149f786c512cee5e9, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::FileDropReceiver
+  files: {fileID: 85963912}
+  backendBaseUrl: http://127.0.0.1:8000
+  importEndpoint: /files/import
 --- !u!1 &316470192
 GameObject:
   m_ObjectHideFlags: 0
@@ -686,8 +702,9 @@ MonoBehaviour:
   files: {fileID: 0}
   backendBaseUrl: http://127.0.0.1:8000
   agentEndpoint: /agent/respond
-  greetingEndpoint: /agent/greeting
   uploadFieldName: audio
+  voiceGreetings: []
+  waveHoldSeconds: 0
   micRecorder: {fileID: 1854671472}
   speechAudioSource: {fileID: 1966542688}
   characterAnimator: {fileID: 1966542684}
