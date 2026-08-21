@@ -16,8 +16,6 @@ public class MicRecorder : MonoBehaviour
 
     private void Start()
     {
-        Debug.Log("MicRecorder Start ran");
-        Debug.Log($"Microphones found: {Microphone.devices.Length}");
 
         foreach (string device in Microphone.devices)
         {

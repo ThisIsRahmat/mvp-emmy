@@ -187,6 +187,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 7b75f0d12093b4857be3429de219203d, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::FilesUI
+  backendBaseUrl: http://127.0.0.1:8000
 --- !u!1 &316470192
 GameObject:
   m_ObjectHideFlags: 0
@@ -217,7 +218,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: cbbd9233de8fb4006828f539c6fa5e6c, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::EmmyUI
-  conversationController: {fileID: 0}
+  conversationController: {fileID: 1854671470}
 --- !u!114 &316470194
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -682,6 +683,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 4d65d1da7be0144c1ac5dfbd91f5bd4b, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ConversationController
+  files: {fileID: 0}
   backendBaseUrl: http://127.0.0.1:8000
   agentEndpoint: /agent/respond
   greetingEndpoint: /agent/greeting
