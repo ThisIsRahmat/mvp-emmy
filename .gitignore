@@ -12,7 +12,14 @@
 #
 
 
+# Recorded mic input and generated TTS output are disposable.
 *.wav
+
+# ...but the pre-recorded greetings are source assets the app loads
+# at runtime via Resources.Load, so they must be committed. Without
+# these the .meta files reference clips that do not exist and the
+# startup greeting silently fails on a fresh clone.
+!Assets/Resources/Greetings/*.wav
 
 # Python
 __pycache__/

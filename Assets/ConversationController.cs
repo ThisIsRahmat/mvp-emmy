@@ -6,11 +6,19 @@ using UnityEngine;
 using UnityEngine.InputSystem;
 using UnityEngine.Networking;
 
+[System.Serializable]
+public class VoiceGreeting
+{
+    public string voiceId;
+    public AudioClip greetingClip;
+    public string greetingText;
+}
+
 public class ConversationController : MonoBehaviour
 {
 
     [SerializeField]
-    private Files files; 
+    private Files files;
 
     [Header("Backend")]
     [SerializeField]
@@ -20,10 +28,29 @@ public class ConversationController : MonoBehaviour
     private string agentEndpoint = "/agent/respond";
 
     [SerializeField]
-    private string greetingEndpoint = "/agent/greeting";
-
-    [SerializeField]
     private string uploadFieldName = "audio";
+
+    [Header("Greeting")]
+    [SerializeField]
+    private VoiceGreeting[] voiceGreetings;
+
+    /*
+     * Optional pause between the wave and the greeting audio.
+     * Zero means they start together, which is what we want by default.
+     */
+    [SerializeField]
+    private float waveHoldSeconds = 0f;
+
+    /*
+     * Greetings load from Resources by naming convention, so there is
+     * nothing to wire in the Inspector: Assets/Resources/Greetings/
+     * greeting_<voiceId>.wav. The voiceGreetings array above is only
+     * needed to override a clip or attach on-screen text.
+     */
+    private const string GreetingResourcePrefix =
+        "Greetings/greeting_";
+
+    private string selectedVoiceId;
 
     [Header("Microphone")]
     [SerializeField]
@@ -56,6 +83,7 @@ public class ConversationController : MonoBehaviour
 
     private bool isBusy;
     private bool isRecording;
+    private bool hasStarted;
 
     private Coroutine activeConversationCoroutine;
 
@@ -64,23 +92,97 @@ public class ConversationController : MonoBehaviour
         ValidateReferences();
     }
 
-    private bool hasStarted = false;
+    public void SetVoice(
+        string voiceId
+    )
+    {
+        selectedVoiceId = voiceId;
+
+        Debug.Log(
+            $"Greeting voice set to: {voiceId}"
+        );
+    }
+
+    /// <summary>
+    /// Returns the Inspector override for the selected voice, if one
+    /// was assigned. Null is normal and means "use Resources".
+    /// </summary>
+    private VoiceGreeting FindGreetingOverride()
+    {
+        if (
+            voiceGreetings == null ||
+            string.IsNullOrWhiteSpace(selectedVoiceId)
+        )
+        {
+            return null;
+        }
+
+        foreach (
+            VoiceGreeting greeting
+            in voiceGreetings
+        )
+        {
+            if (
+                greeting != null &&
+                greeting.voiceId == selectedVoiceId
+            )
+            {
+                return greeting;
+            }
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// Loads Assets/Resources/Greetings/greeting_&lt;voiceId&gt;.wav.
+    /// </summary>
+    private AudioClip LoadGreetingFromResources()
+    {
+        if (
+            string.IsNullOrWhiteSpace(
+                selectedVoiceId
+            )
+        )
+        {
+            Debug.LogError(
+                "No voice was selected, so no greeting can be loaded. " +
+                "SetVoice must be called before StartAgent."
+            );
+
+            return null;
+        }
+
+        string resourcePath =
+            GreetingResourcePrefix + selectedVoiceId;
+
+        AudioClip clip =
+            Resources.Load<AudioClip>(resourcePath);
+
+        if (clip == null)
+        {
+            Debug.LogError(
+                $"No greeting clip at Resources/{resourcePath}. " +
+                $"Expected Assets/Resources/{resourcePath}.wav"
+            );
+        }
+
+        return clip;
+    }
 
     public void StartAgent()
     {
         if (hasStarted)
         {
             return;
-
         }
+
         hasStarted = true;
 
-         StartCoroutine(
-        PlayStartupSequence()
-    );
+        StartCoroutine(
+            PlayStartupSequence()
+        );
     }
-
-
 
     private void Update()
     {
@@ -112,136 +214,95 @@ public class ConversationController : MonoBehaviour
         }
     }
 
-private IEnumerator PlayStartupSequence()
-{
-    isBusy = true;
-    isRecording = false;
-
-    SetState(AgentState.Startup);
-
-    if (characterAnimator != null)
+    private IEnumerator PlayStartupSequence()
     {
-        characterAnimator.ResetTrigger("Wave");
-        characterAnimator.SetTrigger("Wave");
-    }
+        isBusy = true;
+        isRecording = false;
 
-    bool greetingSucceeded = false;
+        SetState(AgentState.Startup);
 
-    yield return StartCoroutine(
-        RequestGreeting(
-            success => greetingSucceeded = success
-        )
-    );
+        if (characterAnimator != null)
+        {
+            characterAnimator.ResetTrigger("Wave");
+            characterAnimator.SetTrigger("Wave");
+        }
 
-    if (!greetingSucceeded)
-    {
-        Debug.LogWarning(
-            "Startup greeting failed, but the agent will remain usable."
-        );
-    }
-
-    isBusy = false;
-
-    SetState(AgentState.Idle);
-
-    Debug.Log(
-        "Startup complete. Agent is ready."
-    );
-}
-
-private IEnumerator RequestGreeting(
-    Action<bool> completed
-)
-{
-    string requestUrl = BuildUrl(
-        backendBaseUrl,
-        greetingEndpoint
-    );
-
-    Debug.Log(
-        $"Requesting greeting from: {requestUrl}"
-    );
-
-    using UnityWebRequest request =
-        UnityWebRequest.Post(
-            requestUrl,
-            new WWWForm()
-        );
-
-    yield return request.SendWebRequest();
-
-    if (
-        request.result !=
-        UnityWebRequest.Result.Success
-    )
-    {
-        Debug.LogError(
-            $"Greeting request failed.\n" +
-            $"URL: {requestUrl}\n" +
-            $"Status: {request.responseCode}\n" +
-            $"Error: {request.error}\n" +
-            $"Response: {request.downloadHandler.text}"
-        );
-
-        completed?.Invoke(false);
-        yield break;
-    }
-
-    GreetingResponse response;
-
-    try
-    {
-        response =
-            JsonUtility.FromJson<GreetingResponse>(
-                request.downloadHandler.text
+        if (waveHoldSeconds > 0f)
+        {
+            yield return new WaitForSeconds(
+                waveHoldSeconds
             );
-    }
-    catch (Exception error)
-    {
-        Debug.LogError(
-            $"Could not parse greeting response: " +
-            $"{error.Message}"
+        }
+
+        bool greetingSucceeded = false;
+
+        yield return StartCoroutine(
+            PlayGreeting(
+                success => greetingSucceeded = success
+            )
         );
 
-        completed?.Invoke(false);
-        yield break;
+        if (!greetingSucceeded)
+        {
+            Debug.LogWarning(
+                "Startup greeting failed, but the agent will remain usable."
+            );
+        }
+
+        isBusy = false;
+
+        SetState(AgentState.Idle);
+
+        Debug.Log(
+            "Startup complete. Agent is ready."
+        );
     }
 
-    if (
-        response == null ||
-        string.IsNullOrWhiteSpace(
-            response.audio_url
-        )
+    /// <summary>
+    /// Plays the pre-recorded greeting for the selected voice.
+    /// This never contacts the backend: a missing clip is a wiring
+    /// problem and should fail immediately rather than stall on TTS.
+    /// </summary>
+    private IEnumerator PlayGreeting(
+        Action<bool> completed
     )
     {
-        Debug.LogError(
-            "Greeting response did not contain an audio URL."
+        VoiceGreeting greetingOverride =
+            FindGreetingOverride();
+
+        AudioClip clip =
+            greetingOverride != null &&
+            greetingOverride.greetingClip != null
+                ? greetingOverride.greetingClip
+                : LoadGreetingFromResources();
+
+        if (clip == null)
+        {
+            completed?.Invoke(false);
+            yield break;
+        }
+
+        if (
+            greetingOverride != null &&
+            responseText != null &&
+            !string.IsNullOrWhiteSpace(
+                greetingOverride.greetingText
+            )
+        )
+        {
+            responseText.text =
+                greetingOverride.greetingText;
+        }
+
+        Debug.Log(
+            $"Playing greeting '{clip.name}' " +
+            $"for voice: {selectedVoiceId}"
         );
 
-        completed?.Invoke(false);
-        yield break;
+        yield return StartCoroutine(
+            PlayClip(clip, completed)
+        );
     }
-
-    Debug.Log(
-        $"Greeting text: {response.text}"
-    );
-
-    string fullAudioUrl = BuildUrl(
-        backendBaseUrl,
-        response.audio_url
-    );
-
-    bool audioSucceeded = false;
-
-    yield return StartCoroutine(
-        DownloadAndPlayAudio(
-            fullAudioUrl,
-            success => audioSucceeded = success
-        )
-    );
-
-    completed?.Invoke(audioSucceeded);
-}
 
     public void StartListening()
     {
@@ -292,7 +353,6 @@ private IEnumerator RequestGreeting(
     /// <summary>
     /// Stops the microphone, obtains the saved WAV path,
     /// and starts the backend request.
-    /// This may also be called from a Unity UI button.
     /// </summary>
     public void StopListeningAndProcess()
     {
@@ -402,7 +462,7 @@ private IEnumerator RequestGreeting(
 
     private IEnumerator ProcessConversation(string recordingPath)
     {
-      
+
         isBusy = true;
         SetState(AgentState.Thinking);
 
@@ -565,6 +625,10 @@ private IEnumerator RequestGreeting(
         Debug.Log("Conversation complete. Agent returned to Idle.");
     }
 
+    /// <summary>
+    /// Downloads a clip from the backend, then hands it to PlayClip
+    /// so streamed and pre-recorded audio behave identically.
+    /// </summary>
     private IEnumerator DownloadAndPlayAudio(
         string audioUrl,
         Action<bool> completed
@@ -630,8 +694,42 @@ private IEnumerator RequestGreeting(
             yield break;
         }
 
+        yield return StartCoroutine(
+            PlayClip(responseClip, completed)
+        );
+    }
+
+    /// <summary>
+    /// Plays a clip through the shared speech AudioSource and blocks
+    /// until it finishes. Used by both the greeting and the responses.
+    /// </summary>
+    private IEnumerator PlayClip(
+        AudioClip clip,
+        Action<bool> completed
+    )
+    {
+        if (speechAudioSource == null)
+        {
+            HandleError(
+                "Speech AudioSource has not been assigned."
+            );
+
+            completed?.Invoke(false);
+            yield break;
+        }
+
+        if (clip == null)
+        {
+            HandleError(
+                "PlayClip was given a null AudioClip."
+            );
+
+            completed?.Invoke(false);
+            yield break;
+        }
+
         speechAudioSource.Stop();
-        speechAudioSource.clip = responseClip;
+        speechAudioSource.clip = clip;
 
         SetState(AgentState.Speaking);
 
@@ -640,7 +738,7 @@ private IEnumerator RequestGreeting(
         if (!speechAudioSource.isPlaying)
         {
             HandleError(
-                "Unity could not start playing the downloaded response audio."
+                $"Unity could not start playing the clip: {clip.name}"
             );
 
             completed?.Invoke(false);
@@ -648,8 +746,8 @@ private IEnumerator RequestGreeting(
         }
 
         /*
-         * uLipSync should analyse this same AudioSource automatically
-         * while the response is playing.
+         * uLipSync analyses this same AudioSource, so pre-recorded
+         * greetings get lip sync exactly like streamed responses.
          */
         while (speechAudioSource.isPlaying)
         {
@@ -747,6 +845,7 @@ private IEnumerator RequestGreeting(
                 "ConversationController: Character Animator is not assigned."
             );
         }
+
     }
 
 private static string BuildUrl(
@@ -801,13 +900,6 @@ public class AgentResponse
     public string transcription;
     public string response_speech;
     public string response_code;
-    public string text;
-    public string audio_url;
-}
-
-[Serializable]
-public class GreetingResponse
-{
     public string text;
     public string audio_url;
 }

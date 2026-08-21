@@ -20,28 +20,19 @@ public class Settings : MonoBehaviour
     [SerializeField]
     private ConversationController conversationController;
 
-    private readonly Dictionary<string, List<string>>
-        ttsVoiceOptions = new()
+    /*
+     * Kokoro is the only provider we expose, so the voice list is flat:
+     * a readable label for the dropdown paired with the backend voice id.
+     * The ids must match the greeting clips in Assets/Audio/Greetings
+     * and the voiceId entries on ConversationController.
+     */
+    private readonly List<VoiceOption> voiceOptions = new()
     {
-        {
-            "Kokoro",
-            new List<string>
-            {
-                "am_adam",
-                "am_michael",
-                "am_liam",
-                "bm_george",
-                "bm_daniel"
-            }
-        },
-        {
-            "Piper",
-            new List<string>
-            {
-                "en_US-ryan-high",
-                "en_GB-alan-medium"
-            }
-        }
+        new VoiceOption("Adam (US)", "am_adam"),
+        new VoiceOption("Michael (US)", "am_michael"),
+        new VoiceOption("Liam (US)", "am_liam"),
+        new VoiceOption("George (UK)", "bm_george"),
+        new VoiceOption("Daniel (UK)", "bm_daniel"),
     };
 
     private void OnEnable()
@@ -92,8 +83,7 @@ if (settingsWrenchButton != null)
                 "tts-voice-dropdown"
             );
 
-        // Populate voices for the single supported TTS provider (default: Kokoro)
-        PopulateTTSVoices("Kokoro");
+        PopulateTTSVoices();
 
         customPromptField =
             root.Q<TextField>(
@@ -175,17 +165,9 @@ if (settingsWrenchButton != null)
 
     // TTS model selection removed: voices are populated directly for the single provider.
 
-    private void PopulateTTSVoices(
-        string selectedTTS
-    )
+    private void PopulateTTSVoices()
     {
-        if (
-            !ttsVoiceOptions.TryGetValue(
-                selectedTTS,
-                out List<string> voices
-            ) ||
-            voices.Count == 0
-        )
+        if (voiceOptions.Count == 0)
         {
             ttsVoiceDropdown.choices =
                 new List<string>();
@@ -199,14 +181,38 @@ if (settingsWrenchButton != null)
             return;
         }
 
+        List<string> labels =
+            voiceOptions.ConvertAll(
+                option => option.label
+            );
+
         ttsVoiceDropdown.choices =
-            voices;
+            labels;
 
         ttsVoiceDropdown.value =
-            voices[0];
+            labels[0];
 
         ttsVoiceDropdown.style.display =
             DisplayStyle.Flex;
+    }
+
+    /// <summary>
+    /// Maps the dropdown label back to the backend voice id.
+    /// Returns an empty string when nothing matches.
+    /// </summary>
+    private string ResolveVoiceId(
+        string label
+    )
+    {
+        foreach (VoiceOption option in voiceOptions)
+        {
+            if (option.label == label)
+            {
+                return option.id;
+            }
+        }
+
+        return string.Empty;
     }
 
     private async void HandleSaveSettings()
@@ -218,23 +224,15 @@ if (settingsWrenchButton != null)
         // TTS model is fixed to Kokoro (only provider exposed)
         string selectedTTS = "Kokoro";
 
+        // The dropdown shows labels; the backend wants the voice id.
         string selectedTTSVoice =
-            ttsVoiceDropdown.value;
+            ResolveVoiceId(ttsVoiceDropdown.value);
 
         string customPrompt =
             selectedAgentType == "Other"
                 ? customPromptField.value.Trim()
                 : string.Empty;
 
-
-        if (string.IsNullOrWhiteSpace(selectedTTS))
-        {
-            Debug.LogError(
-                "Select a TTS model."
-            );
-
-            return;
-        }
 
         if (
             string.IsNullOrWhiteSpace(
@@ -243,7 +241,8 @@ if (settingsWrenchButton != null)
         )
         {
             Debug.LogError(
-                "Select a voice for the selected TTS model."
+                $"Unknown voice selection: " +
+                $"'{ttsVoiceDropdown.value}'."
             );
 
             return;
@@ -361,6 +360,14 @@ if (settingsWrenchButton != null)
 
         if (conversationController != null)
         {
+            /*
+             * The voice has to be set before StartAgent, otherwise
+             * the startup sequence cannot pick the right greeting clip.
+             */
+            conversationController.SetVoice(
+                settings.tts_voice
+            );
+
             conversationController.StartAgent();
         }
         else
@@ -398,6 +405,22 @@ if (settingsWrenchButton != null)
         }
 
         // No TTSDropdown to unregister (single TTS provider)
+    }
+}
+
+
+public class VoiceOption
+{
+    public readonly string label;
+    public readonly string id;
+
+    public VoiceOption(
+        string label,
+        string id
+    )
+    {
+        this.label = label;
+        this.id = id;
     }
 }
 
