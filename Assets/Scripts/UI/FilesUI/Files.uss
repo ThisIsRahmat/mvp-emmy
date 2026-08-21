@@ -19,6 +19,9 @@
     width: 360px;
     height: 380px;
 
+    min-width: 260px;
+    min-height: 220px;
+
     flex-grow: 0;
     flex-shrink: 0;
 
@@ -26,6 +29,19 @@
 
     background-color: rgb(240, 240, 240);
     border-radius: 10px;
+}
+
+
+.resize-handle {
+    position: absolute;
+    right: 0;
+    bottom: 0;
+
+    width: 22px;
+    height: 22px;
+
+    background-color: rgb(190, 190, 190);
+    border-top-left-radius: 8px;
 }
 
 
@@ -41,6 +57,15 @@
 
     font-size: 20px;
     border-radius: 21px;
+
+    scale: 1 1;
+    transition-property: scale;
+    transition-duration: 0.15s;
+}
+
+
+.files-icon-button--drop-active {
+    scale: 1.18 1.18;
 }
 
 
@@ -155,11 +180,14 @@
     display: none;
 
     position: absolute;
-    left: 420px;
-    top: 80px;
+    left: 120px;
+    top: 60px;
 
-    width: 560px;
-    height: 600px;
+    width: 420px;
+    height: 420px;
+
+    min-width: 300px;
+    min-height: 260px;
 
     flex-grow: 0;
     flex-shrink: 0;
@@ -168,34 +196,47 @@
 
     background-color: rgb(245, 245, 245);
     border-radius: 10px;
+
+    /* Content must never push the window bigger than this - long
+       files/filenames scroll or wrap inside instead. */
+    overflow: hidden;
 }
 
 
 .code-header {
     flex-direction: row;
-    align-items: center;
+    align-items: flex-start;
 
-    height: 36px;
+    min-height: 36px;
 
     margin-bottom: 8px;
 }
 
 .code-title {
     flex-grow: 1;
+    flex-shrink: 1;
 
     font-size: 15px;
     -unity-font-style: bold;
+    white-space: normal;
 }
 
 
 .close-code-button {
+    flex-shrink: 0;
+
     width: 30px;
     height: 30px;
 }
 
 
-.code-text {
+.code-scroll {
     flex-grow: 1;
+    min-height: 0;
+}
 
+
+.code-text {
     font-size: 11px;
+    white-space: normal;
 }
