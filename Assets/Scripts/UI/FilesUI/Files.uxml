@@ -12,7 +12,10 @@
             class="files-window"
         >
 
-            <ui:VisualElement class="files-header">
+            <ui:VisualElement
+                name="files-header"
+                class="files-header"
+            >
 
                 <ui:Label
                     text="Project Files"
@@ -28,7 +31,7 @@
             </ui:VisualElement>
 
             <ui:Label
-                text="Select files to give Emmy as context."
+                text="Files Emmy can see. Drag a file onto the folder icon to add more."
                 class="files-description"
             />
 
@@ -47,6 +50,12 @@
 
             </ui:ScrollView>
 
+            <ui:VisualElement
+                name="files-resize-handle"
+                class="resize-handle"
+                picking-mode="Position"
+            />
+
         </ui:VisualElement>
 
 
@@ -57,13 +66,22 @@
     picking-mode="Position"
 />
 
+  <ui:Label
+    name="drop-toast-label"
+    class="drop-toast-label"
+    picking-mode="Ignore"
+/>
+
 
         <ui:VisualElement
             name="code-viewer"
             class="code-viewer"
         >
 
-            <ui:VisualElement class="code-header">
+            <ui:VisualElement
+                name="code-header"
+                class="code-header"
+            >
 
                 <ui:Label
                     name="code-title"
@@ -79,11 +97,25 @@
 
             </ui:VisualElement>
 
-            <ui:TextField
-                name="code-text"
-                multiline="true"
-                is-read-only="true"
-                class="code-text"
+            <ui:ScrollView
+                name="code-scroll"
+                class="code-scroll"
+                mode="Vertical"
+            >
+
+                <ui:TextField
+                    name="code-text"
+                    multiline="true"
+                    is-read-only="true"
+                    class="code-text"
+                />
+
+            </ui:ScrollView>
+
+            <ui:VisualElement
+                name="code-resize-handle"
+                class="resize-handle"
+                picking-mode="Position"
             />
 
         </ui:VisualElement>

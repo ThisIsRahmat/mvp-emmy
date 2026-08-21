@@ -10,22 +10,59 @@ public class Files : MonoBehaviour
     private Label emptyFilesLabel;
 
     private VisualElement filesWindow;
+    private VisualElement filesHeader;
     private Button openFilesButton;
     private Button closeFilesButton;
+    private Label dropToastLabel;
+    private VisualElement filesResizeHandle;
 
     private VisualElement codeViewer;
     private VisualElement codeHeader;
+    private ScrollView codeScroll;
     private Label codeTitle;
     private TextField codeText;
     private Button closeCodeButton;
+    private VisualElement codeResizeHandle;
 
     private bool isDraggingCodeViewer;
 
     private Vector2 codeDragStartPointer;
     private Vector2 codeDragStartPosition;
 
-    private readonly HashSet<string> selectedFiles =
-        new HashSet<string>();
+    private bool isResizingCodeViewer;
+
+    private Vector2 codeResizeDragStartPointer;
+    private Vector2 codeResizeStartSize;
+
+    private const float MinCodeViewerWidth = 300f;
+    private const float MinCodeViewerHeight = 260f;
+
+    private bool isDraggingFilesWindow;
+
+    private Vector2 filesDragStartPointer;
+    private Vector2 filesDragStartPosition;
+
+    private bool isResizingFilesWindow;
+
+    private Vector2 resizeDragStartPointer;
+    private Vector2 resizeStartSize;
+
+    private const float MinFilesWindowWidth = 260f;
+    private const float MinFilesWindowHeight = 220f;
+
+    /// <summary>
+    /// How much of a dragged window must stay within the visible
+    /// root area, so its header/close button can never be dragged
+    /// fully out of reach.
+    /// </summary>
+    private const float MinVisibleWindowMargin = 60f;
+
+    private VisualElement uiRoot;
+
+    private Coroutine dropToastCoroutine;
+
+    private readonly List<string> loadedFilePaths =
+        new List<string>();
 
     [SerializeField]
     private string backendBaseUrl =
@@ -50,6 +87,8 @@ public class Files : MonoBehaviour
         VisualElement root =
             document.rootVisualElement;
 
+        uiRoot = root;
+
 
         // Find file panel controls.
         filesScroll =
@@ -67,6 +106,16 @@ public class Files : MonoBehaviour
                 "files-window"
             );
 
+        filesHeader =
+            root.Q<VisualElement>(
+                "files-header"
+            );
+
+        filesResizeHandle =
+            root.Q<VisualElement>(
+                "files-resize-handle"
+            );
+
         openFilesButton =
             root.Q<Button>(
                 "open-files-button"
@@ -75,6 +124,11 @@ public class Files : MonoBehaviour
         closeFilesButton =
             root.Q<Button>(
                 "close-files-button"
+            );
+
+        dropToastLabel =
+            root.Q<Label>(
+                "drop-toast-label"
             );
 
 
@@ -86,7 +140,7 @@ public class Files : MonoBehaviour
 
         codeHeader =
             root.Q<VisualElement>(
-                className: "code-header"
+                "code-header"
             );
 
         codeTitle =
@@ -99,9 +153,19 @@ public class Files : MonoBehaviour
                 "code-text"
             );
 
+        codeScroll =
+            root.Q<ScrollView>(
+                "code-scroll"
+            );
+
         closeCodeButton =
             root.Q<Button>(
                 "close-code-button"
+            );
+
+        codeResizeHandle =
+            root.Q<VisualElement>(
+                "code-resize-handle"
             );
 
 
@@ -109,13 +173,17 @@ public class Files : MonoBehaviour
         if (
             filesScroll == null ||
             filesWindow == null ||
+            filesHeader == null ||
+            filesResizeHandle == null ||
             openFilesButton == null ||
             closeFilesButton == null ||
             codeViewer == null ||
             codeHeader == null ||
             codeTitle == null ||
             codeText == null ||
-            closeCodeButton == null
+            codeScroll == null ||
+            closeCodeButton == null ||
+            codeResizeHandle == null
         )
         {
             Debug.LogError(
@@ -146,6 +214,12 @@ public class Files : MonoBehaviour
         openFilesButton.style.display =
             DisplayStyle.Flex;
 
+        if (dropToastLabel != null)
+        {
+            dropToastLabel.style.display =
+                DisplayStyle.None;
+        }
+
 
         // Normal button callbacks.
         openFilesButton.clicked +=
@@ -158,27 +232,79 @@ public class Files : MonoBehaviour
             CloseCodeViewer;
 
 
-        // Code viewer dragging.
-        codeHeader.RegisterCallback<PointerDownEvent>(
-            OnCodeHeaderPointerDown
+        // Code viewer dragging - draggable from anywhere in the
+        // window body except the code text, the close button and
+        // the resize handle, which need their own pointer input.
+        codeViewer.RegisterCallback<PointerDownEvent>(
+            OnCodeViewerPointerDown
         );
 
-        codeHeader.RegisterCallback<PointerMoveEvent>(
-            OnCodeHeaderPointerMove
+        codeViewer.RegisterCallback<PointerMoveEvent>(
+            OnCodeViewerPointerMove
         );
 
-        codeHeader.RegisterCallback<PointerUpEvent>(
-            OnCodeHeaderPointerUp
+        codeViewer.RegisterCallback<PointerUpEvent>(
+            OnCodeViewerPointerUp
         );
 
-        codeHeader.RegisterCallback<PointerCaptureOutEvent>(
-            OnCodeHeaderPointerCaptureOut
+        codeViewer.RegisterCallback<PointerCaptureOutEvent>(
+            OnCodeViewerPointerCaptureOut
         );
 
 
-        // Prevent clicking X from also starting a drag.
-        closeCodeButton.RegisterCallback<PointerDownEvent>(
-            OnCloseCodePointerDown
+        // Code viewer resizing.
+        codeResizeHandle.RegisterCallback<PointerDownEvent>(
+            OnCodeResizeHandlePointerDown
+        );
+
+        codeResizeHandle.RegisterCallback<PointerMoveEvent>(
+            OnCodeResizeHandlePointerMove
+        );
+
+        codeResizeHandle.RegisterCallback<PointerUpEvent>(
+            OnCodeResizeHandlePointerUp
+        );
+
+        codeResizeHandle.RegisterCallback<PointerCaptureOutEvent>(
+            OnCodeResizeHandlePointerCaptureOut
+        );
+
+
+        // Files window dragging - draggable from anywhere in the
+        // window body except the scrollable list, the close button
+        // and the resize handle, which need their own pointer input.
+        filesWindow.RegisterCallback<PointerDownEvent>(
+            OnFilesWindowPointerDown
+        );
+
+        filesWindow.RegisterCallback<PointerMoveEvent>(
+            OnFilesWindowPointerMove
+        );
+
+        filesWindow.RegisterCallback<PointerUpEvent>(
+            OnFilesWindowPointerUp
+        );
+
+        filesWindow.RegisterCallback<PointerCaptureOutEvent>(
+            OnFilesWindowPointerCaptureOut
+        );
+
+
+        // Files window resizing.
+        filesResizeHandle.RegisterCallback<PointerDownEvent>(
+            OnFilesResizeHandlePointerDown
+        );
+
+        filesResizeHandle.RegisterCallback<PointerMoveEvent>(
+            OnFilesResizeHandlePointerMove
+        );
+
+        filesResizeHandle.RegisterCallback<PointerUpEvent>(
+            OnFilesResizeHandlePointerUp
+        );
+
+        filesResizeHandle.RegisterCallback<PointerCaptureOutEvent>(
+            OnFilesResizeHandlePointerCaptureOut
         );
 
 
@@ -287,6 +413,7 @@ public class Files : MonoBehaviour
             );
 
         filesScroll.Clear();
+        loadedFilePaths.Clear();
 
         if (
             response == null ||
@@ -381,74 +508,84 @@ public class Files : MonoBehaviour
     // CODE VIEWER DRAGGING
    
 
-    private void OnCodeHeaderPointerDown(
-        PointerDownEvent evt
+    private bool IsExcludedFromCodeViewerDrag(VisualElement target)
+    {
+        if (target == null)
+        {
+            return false;
+        }
+
+        // TextField/Button are composite controls, so a click can
+        // target an internal child rather than the control itself -
+        // check containment, not just reference equality.
+        return
+            IsSameOrDescendant(closeCodeButton, target) ||
+            IsSameOrDescendant(codeResizeHandle, target) ||
+            IsSameOrDescendant(codeScroll, target);
+    }
+
+    private static bool IsSameOrDescendant(
+        VisualElement ancestor,
+        VisualElement target
     )
     {
-        // Only left mouse button.
+        return
+            ancestor != null &&
+            (ancestor == target || ancestor.Contains(target));
+    }
+
+    private void OnCodeViewerPointerDown(PointerDownEvent evt)
+    {
         if (evt.button != 0)
+        {
+            return;
+        }
+
+        if (IsExcludedFromCodeViewerDrag(evt.target as VisualElement))
         {
             return;
         }
 
         isDraggingCodeViewer = true;
 
-        codeDragStartPointer =
-            evt.position;
+        codeDragStartPointer = evt.position;
 
-        codeDragStartPosition =
-            new Vector2(
-                codeViewer.resolvedStyle.left,
-                codeViewer.resolvedStyle.top
-            );
-
-        codeHeader.CapturePointer(
-            evt.pointerId
+        codeDragStartPosition = new Vector2(
+            codeViewer.resolvedStyle.left,
+            codeViewer.resolvedStyle.top
         );
+
+        codeViewer.CapturePointer(evt.pointerId);
 
         evt.StopPropagation();
     }
 
-
-    private void OnCodeHeaderPointerMove(
-        PointerMoveEvent evt
-    )
+    private void OnCodeViewerPointerMove(PointerMoveEvent evt)
     {
         if (
             !isDraggingCodeViewer ||
-            !codeHeader.HasPointerCapture(
-                evt.pointerId
-            )
+            !codeViewer.HasPointerCapture(evt.pointerId)
         )
         {
             return;
         }
 
-        Vector2 currentPointer =
-    new Vector2(
-        evt.position.x,
-        evt.position.y
-    );
+        Vector2 currentPointer = new Vector2(evt.position.x, evt.position.y);
+        Vector2 delta = currentPointer - codeDragStartPointer;
 
-Vector2 delta =
-    currentPointer -
-    codeDragStartPointer;
+        Vector2 clamped = ClampWindowPosition(
+            codeViewer,
+            codeDragStartPosition.x + delta.x,
+            codeDragStartPosition.y + delta.y
+        );
 
-        codeViewer.style.left =
-            codeDragStartPosition.x +
-            delta.x;
-
-        codeViewer.style.top =
-            codeDragStartPosition.y +
-            delta.y;
+        codeViewer.style.left = clamped.x;
+        codeViewer.style.top = clamped.y;
 
         evt.StopPropagation();
     }
 
-
-    private void OnCodeHeaderPointerUp(
-        PointerUpEvent evt
-    )
+    private void OnCodeViewerPointerUp(PointerUpEvent evt)
     {
         if (!isDraggingCodeViewer)
         {
@@ -457,36 +594,306 @@ Vector2 delta =
 
         isDraggingCodeViewer = false;
 
-        if (
-            codeHeader.HasPointerCapture(
-                evt.pointerId
-            )
-        )
+        if (codeViewer.HasPointerCapture(evt.pointerId))
         {
-            codeHeader.ReleasePointer(
-                evt.pointerId
-            );
+            codeViewer.ReleasePointer(evt.pointerId);
         }
 
         evt.StopPropagation();
     }
 
-
-    private void OnCodeHeaderPointerCaptureOut(
-        PointerCaptureOutEvent evt
-    )
+    private void OnCodeViewerPointerCaptureOut(PointerCaptureOutEvent evt)
     {
         isDraggingCodeViewer = false;
     }
 
 
-    private void OnCloseCodePointerDown(
-        PointerDownEvent evt
+    // ----------------------------
+    // CODE VIEWER RESIZING
+    // ----------------------------
+
+    private void OnCodeResizeHandlePointerDown(PointerDownEvent evt)
+    {
+        if (evt.button != 0)
+        {
+            return;
+        }
+
+        isResizingCodeViewer = true;
+
+        codeResizeDragStartPointer = evt.position;
+
+        codeResizeStartSize = new Vector2(
+            codeViewer.resolvedStyle.width,
+            codeViewer.resolvedStyle.height
+        );
+
+        codeResizeHandle.CapturePointer(evt.pointerId);
+
+        evt.StopPropagation();
+    }
+
+    private void OnCodeResizeHandlePointerMove(PointerMoveEvent evt)
+    {
+        if (
+            !isResizingCodeViewer ||
+            !codeResizeHandle.HasPointerCapture(evt.pointerId)
+        )
+        {
+            return;
+        }
+
+        Vector2 currentPointer = new Vector2(evt.position.x, evt.position.y);
+        Vector2 delta = currentPointer - codeResizeDragStartPointer;
+
+        codeViewer.style.width = Mathf.Max(
+            MinCodeViewerWidth,
+            codeResizeStartSize.x + delta.x
+        );
+
+        codeViewer.style.height = Mathf.Max(
+            MinCodeViewerHeight,
+            codeResizeStartSize.y + delta.y
+        );
+
+        evt.StopPropagation();
+    }
+
+    private void OnCodeResizeHandlePointerUp(PointerUpEvent evt)
+    {
+        if (!isResizingCodeViewer)
+        {
+            return;
+        }
+
+        isResizingCodeViewer = false;
+
+        if (codeResizeHandle.HasPointerCapture(evt.pointerId))
+        {
+            codeResizeHandle.ReleasePointer(evt.pointerId);
+        }
+
+        evt.StopPropagation();
+    }
+
+    private void OnCodeResizeHandlePointerCaptureOut(PointerCaptureOutEvent evt)
+    {
+        isResizingCodeViewer = false;
+    }
+
+
+    /// <summary>
+    /// Keeps at least MinVisibleWindowMargin worth of a dragged
+    /// window within the visible root area on every side, so its
+    /// header/close button can never end up fully off-screen and
+    /// unreachable.
+    /// </summary>
+    private Vector2 ClampWindowPosition(
+        VisualElement window,
+        float proposedLeft,
+        float proposedTop
     )
     {
-        // Prevent the close button click
-        // bubbling into the draggable header.
+        if (uiRoot == null)
+        {
+            return new Vector2(proposedLeft, proposedTop);
+        }
+
+        float rootWidth = uiRoot.resolvedStyle.width;
+        float rootHeight = uiRoot.resolvedStyle.height;
+        float windowWidth = window.resolvedStyle.width;
+        float windowHeight = window.resolvedStyle.height;
+
+        float minLeft = MinVisibleWindowMargin - windowWidth;
+        float maxLeft = rootWidth - MinVisibleWindowMargin;
+
+        float minTop = 0f;
+        float maxTop = rootHeight - MinVisibleWindowMargin;
+
+        float clampedLeft = Mathf.Clamp(
+            proposedLeft,
+            Mathf.Min(minLeft, maxLeft),
+            Mathf.Max(minLeft, maxLeft)
+        );
+
+        float clampedTop = Mathf.Clamp(
+            proposedTop,
+            Mathf.Min(minTop, maxTop),
+            Mathf.Max(minTop, maxTop)
+        );
+
+        return new Vector2(clampedLeft, clampedTop);
+    }
+
+
+    // ----------------------------
+    // FILES WINDOW DRAGGING
+    // ----------------------------
+
+    /// <summary>
+    /// The scroll list, close button and resize handle need their own
+    /// pointer input (scrolling, clicking, resizing) rather than
+    /// moving the window, so a drag starting on any of them is
+    /// ignored here.
+    /// </summary>
+    private bool IsExcludedFromWindowDrag(VisualElement target)
+    {
+        if (target == null)
+        {
+            return false;
+        }
+
+        return
+            IsSameOrDescendant(closeFilesButton, target) ||
+            IsSameOrDescendant(filesResizeHandle, target) ||
+            IsSameOrDescendant(filesScroll, target);
+    }
+
+    private void OnFilesWindowPointerDown(PointerDownEvent evt)
+    {
+        if (evt.button != 0)
+        {
+            return;
+        }
+
+        if (IsExcludedFromWindowDrag(evt.target as VisualElement))
+        {
+            return;
+        }
+
+        isDraggingFilesWindow = true;
+
+        filesDragStartPointer = evt.position;
+
+        filesDragStartPosition = new Vector2(
+            filesWindow.resolvedStyle.left,
+            filesWindow.resolvedStyle.top
+        );
+
+        filesWindow.CapturePointer(evt.pointerId);
+
         evt.StopPropagation();
+    }
+
+    private void OnFilesWindowPointerMove(PointerMoveEvent evt)
+    {
+        if (
+            !isDraggingFilesWindow ||
+            !filesWindow.HasPointerCapture(evt.pointerId)
+        )
+        {
+            return;
+        }
+
+        Vector2 currentPointer = new Vector2(evt.position.x, evt.position.y);
+        Vector2 delta = currentPointer - filesDragStartPointer;
+
+        Vector2 clamped = ClampWindowPosition(
+            filesWindow,
+            filesDragStartPosition.x + delta.x,
+            filesDragStartPosition.y + delta.y
+        );
+
+        filesWindow.style.left = clamped.x;
+        filesWindow.style.top = clamped.y;
+
+        evt.StopPropagation();
+    }
+
+    private void OnFilesWindowPointerUp(PointerUpEvent evt)
+    {
+        if (!isDraggingFilesWindow)
+        {
+            return;
+        }
+
+        isDraggingFilesWindow = false;
+
+        if (filesWindow.HasPointerCapture(evt.pointerId))
+        {
+            filesWindow.ReleasePointer(evt.pointerId);
+        }
+
+        evt.StopPropagation();
+    }
+
+    private void OnFilesWindowPointerCaptureOut(PointerCaptureOutEvent evt)
+    {
+        isDraggingFilesWindow = false;
+    }
+
+
+    // ----------------------------
+    // FILES WINDOW RESIZING
+    // ----------------------------
+
+    private void OnFilesResizeHandlePointerDown(PointerDownEvent evt)
+    {
+        if (evt.button != 0)
+        {
+            return;
+        }
+
+        isResizingFilesWindow = true;
+
+        resizeDragStartPointer = evt.position;
+
+        resizeStartSize = new Vector2(
+            filesWindow.resolvedStyle.width,
+            filesWindow.resolvedStyle.height
+        );
+
+        filesResizeHandle.CapturePointer(evt.pointerId);
+
+        evt.StopPropagation();
+    }
+
+    private void OnFilesResizeHandlePointerMove(PointerMoveEvent evt)
+    {
+        if (
+            !isResizingFilesWindow ||
+            !filesResizeHandle.HasPointerCapture(evt.pointerId)
+        )
+        {
+            return;
+        }
+
+        Vector2 currentPointer = new Vector2(evt.position.x, evt.position.y);
+        Vector2 delta = currentPointer - resizeDragStartPointer;
+
+        filesWindow.style.width = Mathf.Max(
+            MinFilesWindowWidth,
+            resizeStartSize.x + delta.x
+        );
+
+        filesWindow.style.height = Mathf.Max(
+            MinFilesWindowHeight,
+            resizeStartSize.y + delta.y
+        );
+
+        evt.StopPropagation();
+    }
+
+    private void OnFilesResizeHandlePointerUp(PointerUpEvent evt)
+    {
+        if (!isResizingFilesWindow)
+        {
+            return;
+        }
+
+        isResizingFilesWindow = false;
+
+        if (filesResizeHandle.HasPointerCapture(evt.pointerId))
+        {
+            filesResizeHandle.ReleasePointer(evt.pointerId);
+        }
+
+        evt.StopPropagation();
+    }
+
+    private void OnFilesResizeHandlePointerCaptureOut(PointerCaptureOutEvent evt)
+    {
+        isResizingFilesWindow = false;
     }
 
 
@@ -505,19 +912,15 @@ Vector2 delta =
                 DisplayStyle.None;
         }
 
+        loadedFilePaths.Add(
+            filePath
+        );
+
         VisualElement row =
             new VisualElement();
 
         row.AddToClassList(
             "file-row"
-        );
-
-
-        Toggle toggle =
-            new Toggle();
-
-        toggle.AddToClassList(
-            "file-toggle"
         );
 
 
@@ -561,31 +964,6 @@ Vector2 delta =
         );
 
 
-        toggle.RegisterValueChangedCallback(
-            evt =>
-            {
-                if (evt.newValue)
-                {
-                    selectedFiles.Add(
-                         filePath
-                    );
-                }
-                else
-                {
-                    selectedFiles.Remove(
-                         filePath
-                    );
-                }
-
-                Debug.Log(
-                    $"Selected context files: " +
-                    $"{string.Join(", ", selectedFiles)}"
-                );
-            }
-        );
-
-
-        row.Add(toggle);
         row.Add(name);
         row.Add(statusBadge);
         row.Add(viewButton);
@@ -597,7 +975,7 @@ Vector2 delta =
     public List<string> GetSelectedFiles()
     {
         return new List<string>(
-            selectedFiles
+            loadedFilePaths
         );
     }
 
@@ -606,6 +984,60 @@ Vector2 delta =
         StartCoroutine(
             LoadFilesFromBackend()
         );
+    }
+
+    /// <summary>
+    /// Called by FileDropReceiver once a dropped file has been imported
+    /// on the backend. Flashes the filename at the drop-target icon,
+    /// then expands the panel so the new file is visible.
+    /// </summary>
+    public void OnFileImported(string fileName)
+    {
+        if (dropToastCoroutine != null)
+        {
+            StopCoroutine(dropToastCoroutine);
+        }
+
+        dropToastCoroutine = StartCoroutine(
+            ShowDropToastThenRefresh(fileName)
+        );
+    }
+
+    /// <summary>
+    /// Flashes the filename and pops the folder icon to acknowledge
+    /// the drop, then quietly refreshes the file list in the
+    /// background without opening the panel.
+    /// </summary>
+    private IEnumerator ShowDropToastThenRefresh(string fileName)
+    {
+        if (dropToastLabel != null)
+        {
+            dropToastLabel.text = fileName;
+            dropToastLabel.style.display = DisplayStyle.Flex;
+        }
+
+        if (openFilesButton != null)
+        {
+            openFilesButton.text = "📂";
+            openFilesButton.AddToClassList("files-icon-button--drop-active");
+        }
+
+        yield return new WaitForSeconds(1.2f);
+
+        if (dropToastLabel != null)
+        {
+            dropToastLabel.style.display = DisplayStyle.None;
+        }
+
+        if (openFilesButton != null)
+        {
+            openFilesButton.text = "📁";
+            openFilesButton.RemoveFromClassList("files-icon-button--drop-active");
+        }
+
+        RefreshFiles();
+
+        dropToastCoroutine = null;
     }
 
 
@@ -628,41 +1060,83 @@ Vector2 delta =
         {
             closeCodeButton.clicked -=
                 CloseCodeViewer;
-
-            closeCodeButton.UnregisterCallback<
-                PointerDownEvent
-            >(
-                OnCloseCodePointerDown
-            );
         }
 
-        if (codeHeader != null)
+        if (codeViewer != null)
         {
-            codeHeader.UnregisterCallback<
-                PointerDownEvent
-            >(
-                OnCodeHeaderPointerDown
+            codeViewer.UnregisterCallback<PointerDownEvent>(
+                OnCodeViewerPointerDown
             );
 
-            codeHeader.UnregisterCallback<
-                PointerMoveEvent
-            >(
-                OnCodeHeaderPointerMove
+            codeViewer.UnregisterCallback<PointerMoveEvent>(
+                OnCodeViewerPointerMove
             );
 
-            codeHeader.UnregisterCallback<
-                PointerUpEvent
-            >(
-                OnCodeHeaderPointerUp
+            codeViewer.UnregisterCallback<PointerUpEvent>(
+                OnCodeViewerPointerUp
             );
 
-            codeHeader.UnregisterCallback<
-                PointerCaptureOutEvent
-            >(
-                OnCodeHeaderPointerCaptureOut
+            codeViewer.UnregisterCallback<PointerCaptureOutEvent>(
+                OnCodeViewerPointerCaptureOut
             );
         }
 
+        if (codeResizeHandle != null)
+        {
+            codeResizeHandle.UnregisterCallback<PointerDownEvent>(
+                OnCodeResizeHandlePointerDown
+            );
+
+            codeResizeHandle.UnregisterCallback<PointerMoveEvent>(
+                OnCodeResizeHandlePointerMove
+            );
+
+            codeResizeHandle.UnregisterCallback<PointerUpEvent>(
+                OnCodeResizeHandlePointerUp
+            );
+
+            codeResizeHandle.UnregisterCallback<PointerCaptureOutEvent>(
+                OnCodeResizeHandlePointerCaptureOut
+            );
+        }
+
+        if (filesWindow != null)
+        {
+            filesWindow.UnregisterCallback<PointerDownEvent>(
+                OnFilesWindowPointerDown
+            );
+
+            filesWindow.UnregisterCallback<PointerMoveEvent>(
+                OnFilesWindowPointerMove
+            );
+
+            filesWindow.UnregisterCallback<PointerUpEvent>(
+                OnFilesWindowPointerUp
+            );
+
+            filesWindow.UnregisterCallback<PointerCaptureOutEvent>(
+                OnFilesWindowPointerCaptureOut
+            );
+        }
+
+        if (filesResizeHandle != null)
+        {
+            filesResizeHandle.UnregisterCallback<PointerDownEvent>(
+                OnFilesResizeHandlePointerDown
+            );
+
+            filesResizeHandle.UnregisterCallback<PointerMoveEvent>(
+                OnFilesResizeHandlePointerMove
+            );
+
+            filesResizeHandle.UnregisterCallback<PointerUpEvent>(
+                OnFilesResizeHandlePointerUp
+            );
+
+            filesResizeHandle.UnregisterCallback<PointerCaptureOutEvent>(
+                OnFilesResizeHandlePointerCaptureOut
+            );
+        }
 
     }
 

@@ -1,6 +1,8 @@
 using System;
 using System.Collections;
+using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using TMPro;
 using UnityEngine;
 using UnityEngine.InputSystem;
@@ -499,6 +501,14 @@ public class ConversationController : MonoBehaviour
             "audio/wav"
         );
 
+        if (files != null)
+        {
+            form.AddField(
+                "selected_files",
+                BuildFilePathsJson(files.GetSelectedFiles())
+            );
+        }
+
         string requestUrl = BuildUrl(
             backendBaseUrl,
             agentEndpoint
@@ -847,6 +857,28 @@ public class ConversationController : MonoBehaviour
         }
 
     }
+
+/// <summary>
+/// Hand-builds a JSON string array, since JsonUtility cannot
+/// serialise a bare List&lt;string&gt;. Values are file paths from
+/// the backend's own file listing, so no escaping beyond quotes
+/// and backslashes is expected.
+/// </summary>
+private static string BuildFilePathsJson(List<string> paths)
+{
+    if (paths == null || paths.Count == 0)
+    {
+        return "[]";
+    }
+
+    IEnumerable<string> escaped = paths.Select(
+        path => "\"" +
+            path.Replace("\\", "\\\\").Replace("\"", "\\\"") +
+            "\""
+    );
+
+    return "[" + string.Join(",", escaped) + "]";
+}
 
 private static string BuildUrl(
     string baseUrl,
