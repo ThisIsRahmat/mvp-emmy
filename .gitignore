@@ -161,3 +161,4 @@ outputs/
 # Local editor/schema and UI toolkit workspace
 UIElementsSchema/
 Assets/UI Toolkit/
+.DS_Store

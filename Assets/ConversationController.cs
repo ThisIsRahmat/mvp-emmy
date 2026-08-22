@@ -650,7 +650,15 @@ public class ConversationController : MonoBehaviour
         {
             foreach (CreatedFile created in response.created_files)
             {
-                if (!string.IsNullOrWhiteSpace(created.path))
+                if (string.IsNullOrWhiteSpace(created.path))
+                {
+                    continue;
+                }
+
+                // Existing files were written straight back to their
+                // real path - the user's own editor already picks up
+                // the change, no new row or badge needed here.
+                if (created.is_new)
                 {
                     files.OnFileCreatedByAgent(created.path);
                 }
@@ -1066,4 +1074,5 @@ public class CreatedFile
 {
     public string path;
     public string status;
+    public bool is_new;
 }

@@ -6,6 +6,37 @@ from pathlib import Path
 # the LLM's context window.
 MAX_CONTEXT_FILE_BYTES = 200_000
 
+GENERATED_FILES_ROOT = Path("outputs/generated")
+
+
+def resolve_write_target(
+    returned_path: str,
+    dropped_paths: list[str],
+) -> tuple[str, bool]:
+    """
+    Decides whether a file the LLM returned is an edit to a file the
+    user already dropped in (write back to that exact real path, no
+    drag-out needed - their editor picks up the external change) or
+    a brand new file (needs a session-scoped scratch location).
+
+    Returns (target_path, is_existing_dropped_file).
+    """
+    for dropped_path in dropped_paths:
+        if dropped_path == returned_path:
+            return dropped_path, True
+
+    returned_name = Path(returned_path).name
+    name_matches = [
+        dropped_path
+        for dropped_path in dropped_paths
+        if Path(dropped_path).name == returned_name
+    ]
+
+    if len(name_matches) == 1:
+        return name_matches[0], True
+
+    return returned_path, False
+
 
 class FileTools:
     def __init__(
@@ -130,6 +161,60 @@ class FileTools:
             raise ValueError("File is outside project directory.")
 
         return candidate
+
+    def write_generated_file(
+        self,
+        session_id: str,
+        returned_path: str,
+        content: str,
+    ) -> dict:
+        """
+        Writes a brand-new file the agent created (no matching
+        dropped file to edit in place) into a session-scoped scratch
+        folder, so different sessions/participants never collide and
+        each session starts empty. Only the filename from
+        returned_path is used - the model's own directory guess isn't
+        trusted for where a new file should live on disk.
+        """
+        filename = Path(returned_path).name
+
+        if not filename or Path(filename).suffix != ".cs":
+            raise ValueError(
+                f"Only .cs files can be generated, got: {returned_path}"
+            )
+
+        session_directory = GENERATED_FILES_ROOT / session_id
+        session_directory.mkdir(parents=True, exist_ok=True)
+
+        target = session_directory / filename
+        already_existed = target.exists()
+
+        target.write_text(content, encoding="utf-8")
+
+        return {
+            "status": "modified" if already_existed else "created",
+            "path": str(target.resolve()),
+        }
+
+    def write_to_known_path(self, path: str, content: str) -> dict:
+        """
+        Writes back to a file the user already dropped in as context
+        this session - path is trusted because it's an exact path we
+        read from earlier in this same request flow, not something
+        invented by the LLM. The participant's own editor picks up
+        the external change automatically, no drag needed.
+        """
+        target = Path(path)
+
+        if target.suffix != ".cs":
+            raise ValueError(f"Only .cs files can be written: {path}")
+
+        if not target.exists():
+            raise FileNotFoundError(f"File no longer exists: {path}")
+
+        target.write_text(content, encoding="utf-8")
+
+        return {"status": "modified", "path": str(target)}
 
     def write_file(self, relative_path: str, content: str) -> dict:
         target = self._resolve_safe_path(relative_path)

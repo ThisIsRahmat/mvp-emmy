@@ -1,5 +1,58 @@
+import re
+
 from ollama import chat
-from backend.models.api_models import PromptResponse
+from backend.models.api_models import GeneratedFile, PromptResponse
+
+# Safety net: no amount of prompt wording has reliably stopped the
+# model dumping code straight into response_speech instead of using
+# the files field. Rather than keep fighting that in the prompt, pull
+# any fenced code blocks back out after the fact - this fixes both
+# "code gets read aloud" and "files aren't created" regardless of
+# what the model actually did.
+FENCED_CODE_BLOCK = re.compile(
+    r"(?:\*{0,2}\s*([\w./-]+\.cs)[:*\s]*\n+)?"
+    r"```(?:csharp|cs|c#)?\s*\n(.*?)\n```",
+    re.DOTALL | re.IGNORECASE,
+)
+
+# Defense in depth: catches a lone "**Ball.cs:**"-style header line
+# left behind if the header/fence pairing above didn't match cleanly.
+LEFTOVER_FILENAME_HEADER = re.compile(
+    r"^\s*\*{0,2}\s*[\w./-]+\.cs\s*[:*]*\s*$",
+    re.MULTILINE,
+)
+
+CLASS_NAME = re.compile(r"\bclass\s+(\w+)")
+
+
+def extract_code_blocks_from_speech(
+    response_speech: str,
+) -> tuple[str, list[GeneratedFile]]:
+    extracted: list[GeneratedFile] = []
+
+    def replace(match: re.Match) -> str:
+        filename = match.group(1)
+        code = match.group(2).strip()
+
+        if not filename:
+            class_match = CLASS_NAME.search(code)
+            filename = f"{class_match.group(1)}.cs" if class_match else "GeneratedFile.cs"
+
+        extracted.append(GeneratedFile(path=filename, content=code))
+
+        return ""
+
+    cleaned = FENCED_CODE_BLOCK.sub(replace, response_speech)
+
+    if extracted:
+        cleaned = LEFTOVER_FILENAME_HEADER.sub("", cleaned)
+
+    cleaned = re.sub(r"\n{3,}", "\n\n", cleaned).strip()
+
+    if not cleaned and extracted:
+        cleaned = "Done - check the new file."
+
+    return cleaned, extracted
 
 FILES_FIELD_INSTRUCTIONS = (
     "You MUST respond using two fields:\n"
@@ -9,7 +62,11 @@ FILES_FIELD_INSTRUCTIONS = (
     "- files: a list of {path, content} objects, one per file you are "
     "creating or changing. content is the COMPLETE file, ready to save "
     "exactly as given - not a description of it. Leave files empty ([]) "
-    "if this turn doesn't need a file change.\n"
+    "if this turn doesn't need a file change. If you are editing a file "
+    "that was shown to you above under 'These project files are currently "
+    "selected', you MUST use that exact same path string, character for "
+    "character - do not shorten it or invent a new one. Only make up a new "
+    "path when the file genuinely does not exist yet.\n"
     "If a file is being written, response_speech must NOT also contain that file's code - the code belongs ONLY in files.\n\n"
     "file's code - the code belongs ONLY in files. AND MUST NEVER BE A PART OF response_speech\n\n"
 )
@@ -99,4 +156,14 @@ class LLMService:
             options={"num_predict": 768},
         )
 
-        return PromptResponse.model_validate_json(response["message"]["content"])
+        result = PromptResponse.model_validate_json(response["message"]["content"])
+
+        cleaned_speech, extracted_files = extract_code_blocks_from_speech(
+            result.response_speech
+        )
+
+        if extracted_files:
+            result.response_speech = cleaned_speech
+            result.files = result.files + extracted_files
+
+        return result

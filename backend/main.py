@@ -12,7 +12,7 @@ from backend.services.transcription_service import TranscriptionService
 from backend.services.conversation_service import ConversationService
 from backend.services.llm_service import LLMService
 from backend.services.speech_service import SpeechService
-from backend.tools.file_tools import FileTools
+from backend.tools.file_tools import FileTools, resolve_write_target
 
 
 app = FastAPI()
@@ -215,18 +215,39 @@ def agent_respond(audio: UploadFile = File(...),
         # Write out every file the model produced this turn - a single
         # request can create/modify more than one script.
         created_files = []
+        session_id = (
+            conversation_service.current_session.session_id
+            if conversation_service.current_session
+            else "no-session"
+        )
 
         for generated_file in llm_result.files:
+            target_path, is_existing = resolve_write_target(
+                generated_file.path,
+                file_paths,
+            )
+
             try:
-                result = file_tools.write_file(
-                    generated_file.path,
-                    generated_file.content,
-                )
+                if is_existing:
+                    result = file_tools.write_to_known_path(
+                        target_path,
+                        generated_file.content,
+                    )
+                else:
+                    result = file_tools.write_generated_file(
+                        session_id,
+                        target_path,
+                        generated_file.content,
+                    )
 
                 created_files.append(
-                    {"path": result["path"], "status": result["status"]}
+                    {
+                        "path": result["path"],
+                        "status": result["status"],
+                        "is_new": not is_existing,
+                    }
                 )
-            except ValueError as error:
+            except (ValueError, FileNotFoundError) as error:
                 print(f"Could not write '{generated_file.path}': {error}")
 
         return {
