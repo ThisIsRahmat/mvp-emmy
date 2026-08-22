@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.IO;
+using Shibuya24.Utility;
 using UnityEngine;
 using UnityEngine.UIElements;
 using System.Collections;
@@ -996,6 +997,35 @@ public class Files : MonoBehaviour
         row.Add(name);
         row.Add(statusBadge);
         row.Add(viewButton);
+
+        // Arm this file to be dragged out to the OS (Finder, the
+        // participant's editor) the moment a native drag starts -
+        // consumed after one use, so re-arm on every pointer-down.
+        // Excludes the View button so clicking it still just clicks.
+        row.RegisterCallback<PointerDownEvent>(evt =>
+        {
+            if (evt.button != 0)
+            {
+                return;
+            }
+
+            VisualElement target = evt.target as VisualElement;
+
+            if (IsSameOrDescendant(viewButton, target))
+            {
+                return;
+            }
+
+            UniDragAndDrop.ArmFileDragForNextDrag(filePath);
+        });
+
+        row.RegisterCallback<PointerUpEvent>(evt =>
+        {
+            // Harmless if a drag already consumed the arm - this
+            // just guards against a plain click (no drag) leaving a
+            // stale armed path for some unrelated later gesture.
+            UniDragAndDrop.ArmFileDragForNextDrag(null);
+        });
 
         filesScroll.Add(row);
 
