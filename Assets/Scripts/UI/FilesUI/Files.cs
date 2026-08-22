@@ -926,6 +926,11 @@ public class Files : MonoBehaviour
     bool isNew = false
     )
     {
+        Debug.Log(
+            $"AddFileRow called: fileName='{fileName}' " +
+            $"filePath='{filePath}' isNew={isNew}"
+        );
+
         if (emptyFilesLabel != null)
         {
             emptyFilesLabel.style.display =
@@ -1098,6 +1103,8 @@ public class Files : MonoBehaviour
     /// </summary>
     public void OnFileCreatedByAgent(string filePath)
     {
+        Debug.Log($"Files.OnFileCreatedByAgent called with: '{filePath}'");
+
         string displayName = Path.GetFileName(filePath);
 
         if (loadedFilePaths.Contains(filePath))

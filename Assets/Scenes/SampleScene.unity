@@ -699,7 +699,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 4d65d1da7be0144c1ac5dfbd91f5bd4b, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ConversationController
-  files: {fileID: 0}
+  files: {fileID: 85963912}
   backendBaseUrl: http://127.0.0.1:8000
   agentEndpoint: /agent/respond
   uploadFieldName: audio
@@ -713,6 +713,10 @@ MonoBehaviour:
   responseText: {fileID: 0}
   codeText: {fileID: 0}
   useSpaceToTalk: 1
+  fillerInitialDelayMinSeconds: 3
+  fillerInitialDelayMaxSeconds: 5
+  fillerMinGapSeconds: 15
+  fillerMaxGapSeconds: 20
 --- !u!4 &1854671471
 Transform:
   m_ObjectHideFlags: 0

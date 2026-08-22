@@ -657,10 +657,21 @@ public class ConversationController : MonoBehaviour
             yield break;
         }
 
+        Debug.Log(
+            $"created_files received: " +
+            $"{(response.created_files == null ? "null" : response.created_files.Length.ToString())}, " +
+            $"files component: {(files == null ? "null" : "assigned")}"
+        );
+
         if (files != null && response.created_files != null)
         {
             foreach (CreatedFile created in response.created_files)
             {
+                Debug.Log(
+                    $"created_files entry: path='{created.path}' " +
+                    $"status='{created.status}' is_new={created.is_new}"
+                );
+
                 if (string.IsNullOrWhiteSpace(created.path))
                 {
                     continue;

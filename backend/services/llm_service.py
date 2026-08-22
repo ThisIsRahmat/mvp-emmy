@@ -28,6 +28,14 @@ def extract_code_blocks_from_speech(
         filename = match.group(1)
         code = match.group(2).strip()
 
+        # Generation sometimes gets cut off right as a fence opens,
+        # leaving an empty/near-empty block. This is valid JSON (so
+        # the retry-on-invalid-JSON check never catches it) but
+        # writing it would silently overwrite a real file with
+        # nothing - never treat near-empty content as real code.
+        if len(code) < 10:
+            return ""
+
         if not filename:
             class_match = CLASS_NAME.search(code)
             filename = f"{class_match.group(1)}.cs" if class_match else "GeneratedFile.cs"
@@ -154,6 +162,8 @@ class LLMService:
             # Without this, Ollama's default generation cap was cutting off replises mid_sentence so increased token limit
             options={"num_predict": 768, "repeat_penalty": 1.3},
         )
+
+        print(f"Raw LLM JSON: {response['message']['content']}")
 
         result = PromptResponse.model_validate_json(response["message"]["content"])
 

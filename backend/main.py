@@ -247,6 +247,14 @@ def agent_respond(audio: UploadFile = File(...),
                         "is_new": not is_existing,
                     }
                 )
+
+                if conversation_service.current_session is not None:
+                    conversation_service.add_agent_file_message(
+                        Path(result["path"]).name,
+                        result["path"],
+                        generated_file.content,
+                        created=(result["status"] == "created"),
+                    )
             except (ValueError, FileNotFoundError) as error:
                 print(f"Could not write '{generated_file.path}': {error}")
 
