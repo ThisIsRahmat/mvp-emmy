@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.IO;
 using UnityEngine;
 using UnityEngine.UIElements;
 using System.Collections;
@@ -987,11 +988,14 @@ public class Files : MonoBehaviour
     }
 
     /// <summary>
-    /// Called by FileDropReceiver once a dropped file has been imported
-    /// on the backend. Flashes the filename at the drop-target icon,
-    /// then expands the panel so the new file is visible.
+    /// Called by FileDropReceiver once a dropped file has been
+    /// registered with the backend by path. Flashes the filename at
+    /// the drop-target icon, then adds it to the list directly -
+    /// dropped files live wherever the participant's own project is,
+    /// not under a folder the backend can rescan, so this adds the
+    /// row itself instead of calling RefreshFiles().
     /// </summary>
-    public void OnFileImported(string fileName)
+    public void OnFileImported(string filePath)
     {
         if (dropToastCoroutine != null)
         {
@@ -999,20 +1003,22 @@ public class Files : MonoBehaviour
         }
 
         dropToastCoroutine = StartCoroutine(
-            ShowDropToastThenRefresh(fileName)
+            ShowDropToastThenAddRow(filePath)
         );
     }
 
     /// <summary>
     /// Flashes the filename and pops the folder icon to acknowledge
-    /// the drop, then quietly refreshes the file list in the
-    /// background without opening the panel.
+    /// the drop, then adds the file to the list without opening the
+    /// panel.
     /// </summary>
-    private IEnumerator ShowDropToastThenRefresh(string fileName)
+    private IEnumerator ShowDropToastThenAddRow(string filePath)
     {
+        string displayName = Path.GetFileName(filePath);
+
         if (dropToastLabel != null)
         {
-            dropToastLabel.text = fileName;
+            dropToastLabel.text = displayName;
             dropToastLabel.style.display = DisplayStyle.Flex;
         }
 
@@ -1035,7 +1041,10 @@ public class Files : MonoBehaviour
             openFilesButton.RemoveFromClassList("files-icon-button--drop-active");
         }
 
-        RefreshFiles();
+        if (!loadedFilePaths.Contains(filePath))
+        {
+            AddFileRow(displayName, filePath);
+        }
 
         dropToastCoroutine = null;
     }

@@ -71,6 +71,32 @@ class ConversationService:
 
         return message
 
+    def add_context_file_message(
+        self,
+        file_name: str,
+        file_path: str,
+        content: str,
+    ) -> ConversationMessage:
+        """
+        Records a dropped file as part of the conversation history
+        (role="user"), so it flows to the LLM through the normal
+        history window on subsequent turns instead of needing to be
+        re-attached out of band on every request.
+        """
+
+        message = ConversationMessage(
+            timestamp=datetime.now(),
+            role="user",
+            content=(
+                f"[Added file as context: {file_name} ({file_path})]\n\n"
+                f"```\n{content}\n```"
+            ),
+        )
+
+        self._add_message(message)
+
+        return message
+
     def add_agent_message(
         self,
         content: str,

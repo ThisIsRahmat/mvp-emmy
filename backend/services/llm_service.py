@@ -4,7 +4,7 @@ from backend.models.api_models import PromptResponse
 
 class LLMService:
     def __init__(self,
-                 model: str = "gemma3:4b",
+                 model: str = "qwen2.5",
                  agent_type: str = "Peer",
                  custom_prompt: str = ""):
         self.model = model
