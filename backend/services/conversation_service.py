@@ -97,6 +97,35 @@ class ConversationService:
 
         return message
 
+    def add_agent_file_message(
+        self,
+        file_name: str,
+        file_path: str,
+        content: str,
+        created: bool,
+    ) -> ConversationMessage:
+        """
+        Mirrors add_context_file_message, but for a file the agent
+        itself wrote rather than one the user dropped in - role is
+        "assistant" since it's the agent's own action, so it still
+        flows into the history window on later turns.
+        """
+
+        verb = "Created" if created else "Updated"
+
+        message = ConversationMessage(
+            timestamp=datetime.now(),
+            role="assistant",
+            content=(
+                f"[{verb} file: {file_name} ({file_path})]\n\n"
+                f"```\n{content}\n```"
+            ),
+        )
+
+        self._add_message(message)
+
+        return message
+
     def add_agent_message(
         self,
         content: str,

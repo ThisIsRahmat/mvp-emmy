@@ -192,6 +192,17 @@ public class ConversationController : MonoBehaviour
         return clip;
     }
 
+    /// <summary>
+    /// Called every time Settings is saved successfully - not just
+    /// the first time, since Settings can be reopened later in the
+    /// same run. The backend starts a fresh session/scratch folder
+    /// on every /settings save, so the Files panel must match.
+    /// </summary>
+    public void ResetForNewSession()
+    {
+        files?.ClearSession();
+    }
+
     public void StartAgent()
     {
         if (hasStarted)
@@ -646,21 +657,38 @@ public class ConversationController : MonoBehaviour
             yield break;
         }
 
+        Debug.Log(
+            $"created_files received: " +
+            $"{(response.created_files == null ? "null" : response.created_files.Length.ToString())}, " +
+            $"files component: {(files == null ? "null" : "assigned")}"
+        );
+
         if (files != null && response.created_files != null)
         {
             foreach (CreatedFile created in response.created_files)
             {
+                Debug.Log(
+                    $"created_files entry: path='{created.path}' " +
+                    $"status='{created.status}' is_new={created.is_new}"
+                );
+
                 if (string.IsNullOrWhiteSpace(created.path))
                 {
                     continue;
                 }
 
                 // Existing files were written straight back to their
-                // real path - the user's own editor already picks up
-                // the change, no new row or badge needed here.
+                // real path - the participant's own editor picks up
+                // the change too, but the panel still needs its own
+                // "UPDATED" badge so it's visible without switching
+                // windows.
                 if (created.is_new)
                 {
                     files.OnFileCreatedByAgent(created.path);
+                }
+                else
+                {
+                    files.OnFileModifiedByAgent(created.path);
                 }
             }
         }

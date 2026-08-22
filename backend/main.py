@@ -86,10 +86,13 @@ def warm_up(llm_service: LLMService, speech_service: SpeechService) -> None:
     except Exception as error:
         print(f"TTS warm-up failed (non-fatal): {error}")
 
-    try:
-        llm_service.generate_response(prompt="Hello", history=[])
-    except Exception as error:
-        print(f"LLM warm-up failed (non-fatal): {error}")
+
+
+# testing to see if still need the warm up for LLM now using gemma model
+    # try:
+    #     llm_service.generate_response(prompt="Hello", history=[])
+    # except Exception as error:
+    #     print(f"LLM warm-up failed (non-fatal): {error}")
 
 
 # Initialize default services so endpoints work before a /settings call
@@ -247,8 +250,18 @@ def agent_respond(audio: UploadFile = File(...),
                         "is_new": not is_existing,
                     }
                 )
+
+                if conversation_service.current_session is not None:
+                    conversation_service.add_agent_file_message(
+                        Path(result["path"]).name,
+                        result["path"],
+                        generated_file.content,
+                        created=(result["status"] == "created"),
+                    )
             except (ValueError, FileNotFoundError) as error:
                 print(f"Could not write '{generated_file.path}': {error}")
+
+        print(f"created_files this turn: {created_files}")
 
         return {
             "transcription": transcription,

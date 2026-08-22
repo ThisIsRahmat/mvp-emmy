@@ -178,10 +178,8 @@ class FileTools:
         """
         filename = Path(returned_path).name
 
-        if not filename or Path(filename).suffix != ".cs":
-            raise ValueError(
-                f"Only .cs files can be generated, got: {returned_path}"
-            )
+        if not filename:
+            raise ValueError(f"No filename in path: {returned_path}")
 
         session_directory = GENERATED_FILES_ROOT / session_id
         session_directory.mkdir(parents=True, exist_ok=True)
@@ -206,11 +204,20 @@ class FileTools:
         """
         target = Path(path)
 
-        if target.suffix != ".cs":
-            raise ValueError(f"Only .cs files can be written: {path}")
-
         if not target.exists():
             raise FileNotFoundError(f"File no longer exists: {path}")
+
+        # This writes straight to the participant's real project file
+        # with no chance to review first - a bad generation (garbled
+        # content, wrong file matched) overwrites it silently. Keep
+        # a backup of whatever was there before every overwrite, so
+        # a bad write is always one copy away from being undone even
+        # if the file isn't tracked in git.
+        backup_path = target.with_suffix(target.suffix + ".emmy-backup")
+        backup_path.write_text(
+            target.read_text(encoding="utf-8"),
+            encoding="utf-8",
+        )
 
         target.write_text(content, encoding="utf-8")
 

@@ -368,6 +368,7 @@ if (settingsWrenchButton != null)
                 settings.tts_voice
             );
 
+            conversationController.ResetForNewSession();
             conversationController.StartAgent();
         }
         else
