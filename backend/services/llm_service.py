@@ -160,7 +160,12 @@ class LLMService:
             messages=messages,
             format=PromptResponse.model_json_schema(),
             # Without this, Ollama's default generation cap was cutting off replises mid_sentence so increased token limit
-            options={"num_predict": 768, "repeat_penalty": 1.3},
+            # 768 was enough for short new scripts, but editing an
+            # existing file means echoing its entire content back -
+            # a real file (plus JSON string-escaping overhead) can
+            # easily blow past that, cutting generation off mid-file
+            # with technically-invalid JSON.
+            options={"num_predict": 2048, "repeat_penalty": 1.3},
         )
 
         print(f"Raw LLM JSON: {response['message']['content']}")
