@@ -212,21 +212,28 @@ def agent_respond(audio: UploadFile = File(...),
 
 
 
-        # Only attempt a file write if the model actually returned file info
-        file_result = None
-        if llm_result.response_code and getattr(llm_result, "file_path", None):
-            file_result = file_tools.write_file(
-                llm_result.file_path,
-                llm_result.response_code,
-            )
+        # Write out every file the model produced this turn - a single
+        # request can create/modify more than one script.
+        created_files = []
+
+        for generated_file in llm_result.files:
+            try:
+                result = file_tools.write_file(
+                    generated_file.path,
+                    generated_file.content,
+                )
+
+                created_files.append(
+                    {"path": result["path"], "status": result["status"]}
+                )
+            except ValueError as error:
+                print(f"Could not write '{generated_file.path}': {error}")
 
         return {
             "transcription": transcription,
             "response_speech": llm_result.response_speech,
-            "response_code": llm_result.response_code,
             "audio_url": f"/audio/{relative_path.as_posix()}",
-            "file_status": file_result["status"] if file_result else None,
-            "file_path": file_result["path"] if file_result else None,
+            "created_files": created_files,
         }
 
     except Exception as error:

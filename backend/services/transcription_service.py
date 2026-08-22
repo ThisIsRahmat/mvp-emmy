@@ -5,7 +5,7 @@ from faster_whisper import WhisperModel
 class TranscriptionService:
     def __init__(
         self,
-        model_name: str = "tiny.en",
+        model_name: str = "small.en",
     ):
         # CTranslate2-based reimplementation of Whisper - same
         # accuracy, much faster on CPU (int8 quantized).
@@ -23,6 +23,9 @@ class TranscriptionService:
         segments, _info = self.client.transcribe(
             str(audio_path),
             language="en",
+            # Trims leading/trailing silence and noise before
+            # transcribing, which was contributing to garbled results.
+            vad_filter=True,
         )
 
         return "".join(segment.text for segment in segments).strip()

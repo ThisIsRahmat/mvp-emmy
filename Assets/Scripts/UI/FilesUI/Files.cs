@@ -16,6 +16,13 @@ public class Files : MonoBehaviour
     private Button closeFilesButton;
     private Label dropToastLabel;
     private VisualElement filesResizeHandle;
+    private VisualElement newFilesIconBadge;
+
+    private readonly Dictionary<string, Label> statusBadgeByPath =
+        new Dictionary<string, Label>();
+
+    private readonly HashSet<string> unviewedNewPaths =
+        new HashSet<string>();
 
     private VisualElement codeViewer;
     private VisualElement codeHeader;
@@ -132,6 +139,11 @@ public class Files : MonoBehaviour
                 "drop-toast-label"
             );
 
+        newFilesIconBadge =
+            root.Q<VisualElement>(
+                "new-files-icon-badge"
+            );
+
 
         // Find code viewer controls.
         codeViewer =
@@ -221,6 +233,15 @@ public class Files : MonoBehaviour
                 DisplayStyle.None;
         }
 
+        // Each session starts with an empty list - only files
+        // dropped in or created by the agent this session belong
+        // here, not a rescan of some fixed folder.
+        if (emptyFilesLabel != null)
+        {
+            emptyFilesLabel.style.display =
+                DisplayStyle.Flex;
+        }
+
 
         // Normal button callbacks.
         openFilesButton.clicked +=
@@ -307,12 +328,6 @@ public class Files : MonoBehaviour
         filesResizeHandle.RegisterCallback<PointerCaptureOutEvent>(
             OnFilesResizeHandlePointerCaptureOut
         );
-
-
-        StartCoroutine(
-    LoadFilesFromBackend()
-);
-
 
 
     }
@@ -415,6 +430,9 @@ public class Files : MonoBehaviour
 
         filesScroll.Clear();
         loadedFilePaths.Clear();
+        statusBadgeByPath.Clear();
+        unviewedNewPaths.Clear();
+        UpdateNewFilesIconBadge();
 
         if (
             response == null ||
@@ -904,7 +922,8 @@ public class Files : MonoBehaviour
 
     private void AddFileRow(
     string fileName,
-    string filePath
+    string filePath,
+    bool isNew = false
     )
     {
         if (emptyFilesLabel != null)
@@ -943,11 +962,15 @@ public class Files : MonoBehaviour
         statusBadge.style.display =
             DisplayStyle.None;
 
+        statusBadgeByPath[filePath] = statusBadge;
+
 
         Button viewButton =
         new Button(
             () =>
             {
+                ClearNew(filePath);
+
                 StartCoroutine(
                     LoadFileContent(
                         fileName,
@@ -970,6 +993,53 @@ public class Files : MonoBehaviour
         row.Add(viewButton);
 
         filesScroll.Add(row);
+
+        if (isNew)
+        {
+            MarkAsNew(filePath);
+        }
+    }
+
+    /// <summary>
+    /// Flags a file as new/unviewed - shows a "NEW" pill on its row
+    /// and a red dot on the closed folder icon until it's viewed.
+    /// </summary>
+    private void MarkAsNew(string filePath)
+    {
+        if (statusBadgeByPath.TryGetValue(filePath, out Label badge))
+        {
+            badge.text = "NEW";
+            badge.AddToClassList("file-status--new");
+            badge.style.display = DisplayStyle.Flex;
+        }
+
+        unviewedNewPaths.Add(filePath);
+        UpdateNewFilesIconBadge();
+    }
+
+    private void ClearNew(string filePath)
+    {
+        if (statusBadgeByPath.TryGetValue(filePath, out Label badge))
+        {
+            badge.style.display = DisplayStyle.None;
+            badge.RemoveFromClassList("file-status--new");
+        }
+
+        unviewedNewPaths.Remove(filePath);
+        UpdateNewFilesIconBadge();
+    }
+
+    private void UpdateNewFilesIconBadge()
+    {
+        if (newFilesIconBadge == null)
+        {
+            return;
+        }
+
+        newFilesIconBadge.style.display =
+            unviewedNewPaths.Count > 0
+                ? DisplayStyle.Flex
+                : DisplayStyle.None;
     }
 
 
@@ -985,6 +1055,26 @@ public class Files : MonoBehaviour
         StartCoroutine(
             LoadFilesFromBackend()
         );
+    }
+
+    /// <summary>
+    /// Called by ConversationController when the agent writes/modifies
+    /// a file. Unlike a user drop, this gets a "NEW" badge on the row
+    /// and a red dot on the folder icon until viewed.
+    /// </summary>
+    public void OnFileCreatedByAgent(string filePath)
+    {
+        string displayName = Path.GetFileName(filePath);
+
+        if (loadedFilePaths.Contains(filePath))
+        {
+            // Already listed (e.g. edited again this session) - just
+            // re-flag it as new rather than adding a duplicate row.
+            MarkAsNew(filePath);
+            return;
+        }
+
+        AddFileRow(displayName, filePath, isNew: true);
     }
 
     /// <summary>

@@ -105,6 +105,12 @@ public class ConversationController : MonoBehaviour
 
     private void Awake()
     {
+        // No VSync and no frame cap meant this rendered uncapped
+        // (100s of FPS for a simple scene), pegging the CPU/GPU
+        // continuously - this was starving the backend's STT/LLM/TTS
+        // processes of resources and contributing to swap thrashing.
+        Application.targetFrameRate = 60;
+
         ValidateReferences();
     }
 
@@ -602,9 +608,12 @@ public class ConversationController : MonoBehaviour
         Debug.Log($"User transcription: {response.transcription}");
         Debug.Log($"Agent response: {response.response_speech}");
 
-        if (!string.IsNullOrWhiteSpace(response.response_code))
+        if (response.created_files != null)
         {
-            Debug.Log($"Generated code:\n{response.response_code}");
+            foreach (CreatedFile created in response.created_files)
+            {
+                Debug.Log($"Created file: {created.path} ({created.status})");
+            }
         }
 
         if (string.IsNullOrWhiteSpace(response.audio_url))
@@ -637,9 +646,15 @@ public class ConversationController : MonoBehaviour
             yield break;
         }
 
-        if (files != null)
+        if (files != null && response.created_files != null)
         {
-            files.RefreshFiles();
+            foreach (CreatedFile created in response.created_files)
+            {
+                if (!string.IsNullOrWhiteSpace(created.path))
+                {
+                    files.OnFileCreatedByAgent(created.path);
+                }
+            }
         }
 
         isBusy = false;
@@ -801,7 +816,15 @@ public class ConversationController : MonoBehaviour
         if (codeText != null)
         {
             codeText.text =
-                response.response_code ?? string.Empty;
+                response.created_files is { Length: > 0 }
+                    ? string.Join(
+                        "\n",
+                        Array.ConvertAll(
+                            response.created_files,
+                            created => created.path
+                        )
+                    )
+                    : string.Empty;
         }
     }
 
@@ -1033,7 +1056,14 @@ public class AgentResponse
 {
     public string transcription;
     public string response_speech;
-    public string response_code;
     public string text;
     public string audio_url;
+    public CreatedFile[] created_files;
+}
+
+[Serializable]
+public class CreatedFile
+{
+    public string path;
+    public string status;
 }

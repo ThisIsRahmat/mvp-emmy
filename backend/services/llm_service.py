@@ -1,10 +1,23 @@
 from ollama import chat
 from backend.models.api_models import PromptResponse
 
+FILES_FIELD_INSTRUCTIONS = (
+    "You MUST respond using two fields:\n"
+    "- response_speech: ONLY natural spoken language, this is READ ALOUD by "
+    "text-to-speech. It must NEVER contain code, brace characters, semicolons, "
+    "or anything that looks like a code block \n"
+    "- files: a list of {path, content} objects, one per file you are "
+    "creating or changing. content is the COMPLETE file, ready to save "
+    "exactly as given - not a description of it. Leave files empty ([]) "
+    "if this turn doesn't need a file change.\n"
+    "If a file is being written, response_speech must NOT also contain that file's code - the code belongs ONLY in files.\n\n"
+    "file's code - the code belongs ONLY in files. AND MUST NEVER BE A PART OF response_speech\n\n"
+)
+
 
 class LLMService:
     def __init__(self,
-                 model: str = "qwen2.5",
+                 model: str = "gemma3:4b",
                  agent_type: str = "Peer",
                  custom_prompt: str = ""):
         self.model = model
@@ -16,14 +29,11 @@ class LLMService:
             return (
                 "You are an AI programming instructor, embodied as a character in Unity that the learner can see and talk to.\n\n"
                 "Guide the learner through programming problems.\n"
-                                # "Normally use 1-3 short sentences and no more than approximately 40 words.\n"
                 "Explain concepts clearly.\n"
                 "Ask guiding questions where appropriate.\n"
-                "You MUST respond using three fields:\n"
-                "- response_speech: ONLY natural spoken language. NEVER include code, code blocks, or markdown formatting here. This will be read aloud by a text-to-speech system.\n"
-                "- response_code: The COMPLETE content of the file being created or modified, if any. Leave this empty (\"\") if no file change is being made this turn.\n"
-                "- file_path: The exact relative path of the file being written, e.g. \"PaddleController.cs\". Leave this empty (\"\") if no file change is being made this turn.\n\n"
-                "When the learner asks you to implement or change something, provide a complete, working implementation directly in response_code rather than asking clarifying questions, unless the request is genuinely ambiguous about WHICH file or WHICH feature is meant.\n\n"
+                "response_speech MUST ALWAYS be you written response and NEVER blocks or lines of code. \n"
+                + FILES_FIELD_INSTRUCTIONS +
+                "When the learner asks you to implement or change something, DO IT NOW by adding entries to files. Pick sensible defaults yourself instead of asking what they want - never ask a question when you could just make a reasonable choice and say what you chose. Only ask a clarifying question if the request is genuinely ambiguous about WHICH file is being changed. You may write more than one file in a single turn if the request needs it - add one entry per file.\n\n"
 
             )
 
@@ -32,13 +42,10 @@ class LLMService:
                 "You are an AI pair-programming companion, embodied as a character the developer can see and talk to.\n\n"
                 "Collaborate with the developer as a teammate.\n"
                 "Discuss ideas, trade-offs and implementation choices when asked.\n"
-                "Give concise and practical coding assistance.\n\n"
-                # "Normally use 1-3 short sentences and no more than approximately 40 words.\n"
-                "You MUST respond using three fields:\n"
-                "- response_speech: ONLY natural spoken language. NEVER include code, code blocks, or markdown formatting here. This will be read aloud by a text-to-speech system.\n"
-                "- response_code: The COMPLETE content of the file being created or modified, if any. Leave this empty (\"\") if no file change is being made this turn.\n"
-                "- file_path: The exact relative path of the file being written, e.g. \"PaddleController.cs\". Leave this empty (\"\") if no file change is being made this turn.\n\n"
-                "When the developer asks you to implement or change something, provide a complete, working implementation directly in response_code rather than asking clarifying questions, unless the request is genuinely ambiguous about WHICH file or WHICH feature is meant.\n\n"
+                "Give concise and practical coding assistance.\n"
+                "response_speech MUST ALWAYS be you written response and NEVER blocks or lines of code. \n"
+                + FILES_FIELD_INSTRUCTIONS +
+                "When the developer asks you to implement or change something, DO IT NOW by adding entries to files. Pick sensible defaults yourself instead of asking what they want - never ask a question when you could just make a reasonable choice and say what you chose. Only ask a clarifying question if the request is genuinely ambiguous about WHICH file is being changed. You may write more than one file in a single turn if the request needs it - add one entry per file.\n\n"
 
             )
 
@@ -88,9 +95,7 @@ class LLMService:
             model=self.model,
             messages=messages,
             format=PromptResponse.model_json_schema(),
-            # Without this, Ollama's default generation cap was
-            # truncating replies mid-sentence regardless of prompt
-            # wording - not a prompt problem, a token-limit one.
+            # Without this, Ollama's default generation cap was cutting off replises mid_sentence so increased token limit
             options={"num_predict": 768},
         )
 

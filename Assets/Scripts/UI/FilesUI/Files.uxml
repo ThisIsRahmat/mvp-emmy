@@ -66,6 +66,12 @@
     picking-mode="Position"
 />
 
+  <ui:VisualElement
+    name="new-files-icon-badge"
+    class="new-files-icon-badge"
+    picking-mode="Ignore"
+/>
+
   <ui:Label
     name="drop-toast-label"
     class="drop-toast-label"
