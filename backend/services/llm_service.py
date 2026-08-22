@@ -16,7 +16,7 @@ class LLMService:
             return (
                 "You are an AI programming instructor, embodied as a character in Unity that the learner can see and talk to.\n\n"
                 "Guide the learner through programming problems.\n"
-                                "Normally use 1-3 short sentences and no more than approximately 40 words.\n"
+                                # "Normally use 1-3 short sentences and no more than approximately 40 words.\n"
                 "Explain concepts clearly.\n"
                 "Ask guiding questions where appropriate.\n"
                 "You MUST respond using three fields:\n"
@@ -33,7 +33,7 @@ class LLMService:
                 "Collaborate with the developer as a teammate.\n"
                 "Discuss ideas, trade-offs and implementation choices when asked.\n"
                 "Give concise and practical coding assistance.\n\n"
-                "Normally use 1-3 short sentences and no more than approximately 40 words.\n"
+                # "Normally use 1-3 short sentences and no more than approximately 40 words.\n"
                 "You MUST respond using three fields:\n"
                 "- response_speech: ONLY natural spoken language. NEVER include code, code blocks, or markdown formatting here. This will be read aloud by a text-to-speech system.\n"
                 "- response_code: The COMPLETE content of the file being created or modified, if any. Leave this empty (\"\") if no file change is being made this turn.\n"
@@ -88,6 +88,10 @@ class LLMService:
             model=self.model,
             messages=messages,
             format=PromptResponse.model_json_schema(),
+            # Without this, Ollama's default generation cap was
+            # truncating replies mid-sentence regardless of prompt
+            # wording - not a prompt problem, a token-limit one.
+            options={"num_predict": 768},
         )
 
         return PromptResponse.model_validate_json(response["message"]["content"])

@@ -21,18 +21,18 @@ public class Settings : MonoBehaviour
     private ConversationController conversationController;
 
     /*
-     * Kokoro is the only provider we expose, so the voice list is flat:
+     * Piper is the only provider we expose, so the voice list is flat:
      * a readable label for the dropdown paired with the backend voice id.
      * The ids must match the greeting clips in Assets/Audio/Greetings
      * and the voiceId entries on ConversationController.
      */
     private readonly List<VoiceOption> voiceOptions = new()
     {
-        new VoiceOption("Adam (US)", "am_adam"),
-        new VoiceOption("Michael (US)", "am_michael"),
-        new VoiceOption("Liam (US)", "am_liam"),
-        new VoiceOption("George (UK)", "bm_george"),
-        new VoiceOption("Daniel (UK)", "bm_daniel"),
+        new VoiceOption("Alan (UK)", "en_GB-alan-medium"),
+        new VoiceOption("Ryan (US)", "en_US-ryan-medium"),
+        new VoiceOption("Joe (US)", "en_US-joe-medium"),
+        new VoiceOption("Danny (US)", "en_US-danny-low"),
+        new VoiceOption("Northern English Male (UK)", "en_GB-northern_english_male-medium"),
     };
 
     private void OnEnable()
@@ -221,8 +221,8 @@ if (settingsWrenchButton != null)
             agentTypeDropdown.value;
 
 
-        // TTS model is fixed to Kokoro (only provider exposed)
-        string selectedTTS = "Kokoro";
+        // TTS model is fixed to Piper (only provider exposed)
+        string selectedTTS = "Piper";
 
         // The dropdown shows labels; the backend wants the voice id.
         string selectedTTSVoice =

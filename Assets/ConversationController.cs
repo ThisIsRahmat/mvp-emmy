@@ -87,7 +87,21 @@ public class ConversationController : MonoBehaviour
     private bool isRecording;
     private bool hasStarted;
 
+    [Header("Filler Lines")]
+    [SerializeField]
+    private float fillerInitialDelayMinSeconds = 3f;
+
+    [SerializeField]
+    private float fillerInitialDelayMaxSeconds = 5f;
+
+    [SerializeField]
+    private float fillerMinGapSeconds = 15f;
+
+    [SerializeField]
+    private float fillerMaxGapSeconds = 20f;
+
     private Coroutine activeConversationCoroutine;
+    private Coroutine fillerCoroutine;
 
     private void Awake()
     {
@@ -467,6 +481,7 @@ public class ConversationController : MonoBehaviour
 
         isBusy = true;
         SetState(AgentState.Thinking);
+        StartFillers();
 
         byte[] audioBytes;
 
@@ -704,6 +719,8 @@ public class ConversationController : MonoBehaviour
             yield break;
         }
 
+        StopFillers();
+
         yield return StartCoroutine(
             PlayClip(responseClip, completed)
         );
@@ -822,6 +839,8 @@ public class ConversationController : MonoBehaviour
     {
         Debug.LogError(message);
 
+        StopFillers();
+
         if (speechAudioSource != null)
         {
             speechAudioSource.Stop();
@@ -831,6 +850,89 @@ public class ConversationController : MonoBehaviour
         isRecording = false;
 
         SetState(AgentState.Idle);
+    }
+
+    /// <summary>
+    /// Starts looping short filler lines ("Let me dig into that...")
+    /// on the speech AudioSource while the backend is processing, so
+    /// silence isn't the only feedback during Thinking. Loads
+    /// Assets/Resources/Fillers/&lt;voiceId&gt;/*.wav, matching the
+    /// greeting clips' folder-per-voice convention.
+    /// </summary>
+    private void StartFillers()
+    {
+        if (speechAudioSource == null)
+        {
+            return;
+        }
+
+        StopFillers();
+
+        fillerCoroutine = StartCoroutine(PlayFillerLoop());
+    }
+
+    private void StopFillers()
+    {
+        if (fillerCoroutine != null)
+        {
+            StopCoroutine(fillerCoroutine);
+            fillerCoroutine = null;
+        }
+
+        if (speechAudioSource != null)
+        {
+            speechAudioSource.Stop();
+        }
+    }
+
+    private IEnumerator PlayFillerLoop()
+    {
+        AudioClip[] fillerClips =
+            Resources.LoadAll<AudioClip>($"Fillers/{selectedVoiceId}");
+
+        if (fillerClips == null || fillerClips.Length == 0)
+        {
+            yield break;
+        }
+
+        // Reacting the instant Space is released feels robotic - a
+        // beat of silence first reads as "processing what you said".
+        yield return new WaitForSeconds(
+            UnityEngine.Random.Range(
+                fillerInitialDelayMinSeconds,
+                fillerInitialDelayMaxSeconds
+            )
+        );
+
+        int lastIndex = -1;
+
+        while (true)
+        {
+            int index = UnityEngine.Random.Range(0, fillerClips.Length);
+
+            if (fillerClips.Length > 1 && index == lastIndex)
+            {
+                index = (index + 1) % fillerClips.Length;
+            }
+
+            lastIndex = index;
+
+            AudioClip clip = fillerClips[index];
+
+            speechAudioSource.clip = clip;
+            speechAudioSource.Play();
+
+            yield return new WaitForSeconds(clip.length);
+
+            // Real speech has pauses between thoughts - back-to-back
+            // fillers read as unnatural/rapid-fire.
+            float gap = UnityEngine.Random.Range(
+                fillerMinGapSeconds,
+                fillerMaxGapSeconds
+            );
+
+            yield return new WaitForSeconds(gap);
+        }
     }
 
     private void ValidateReferences()

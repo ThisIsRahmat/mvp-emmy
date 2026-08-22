@@ -64,7 +64,7 @@ conversation_service = ConversationService()
 def build_services(settings: AgentSettings):
 
     llm_service = LLMService(agent_type=settings.agent_type, custom_prompt=settings.custom_prompt)
-    speech_service = SpeechService( voice=settings.tts_voice or "am_adam", output_directory=audio_directory)
+    speech_service = SpeechService( voice=settings.tts_voice or "en_GB-alan-medium", output_directory=audio_directory)
 
     return llm_service, speech_service
 
@@ -203,7 +203,11 @@ def agent_respond(audio: UploadFile = File(...),
 
         t3 = time.time()
 
-        print(f"STT: {t1-t0:.1f}s | LLM: {t2-t1:.1f}s | TTS: {t3-t2:.1f}s")
+        print(
+            f"STT: {t1-t0:.1f}s | LLM: {t2-t1:.1f}s | TTS: {t3-t2:.1f}s | "
+            f"reply_len: {len(llm_result.response_speech)} chars | "
+            f"history_msgs: {len(history_for_llm)}"
+        )
 
 
 
