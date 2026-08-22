@@ -250,6 +250,8 @@ def agent_respond(audio: UploadFile = File(...),
             except (ValueError, FileNotFoundError) as error:
                 print(f"Could not write '{generated_file.path}': {error}")
 
+        print(f"created_files this turn: {created_files}")
+
         return {
             "transcription": transcription,
             "response_speech": llm_result.response_speech,

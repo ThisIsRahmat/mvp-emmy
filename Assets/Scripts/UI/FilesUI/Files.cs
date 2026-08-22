@@ -1058,6 +1058,40 @@ public class Files : MonoBehaviour
     }
 
     /// <summary>
+    /// Resets the panel to empty for a new conversation session.
+    /// The backend starts a fresh session (and scratch folder) on
+    /// every successful /settings save, not just on app launch (the
+    /// Settings screen can be reopened and saved again later) - this
+    /// must be called every time that happens, or old rows from a
+    /// previous session stick around.
+    /// </summary>
+    public void ClearSession()
+    {
+        if (dropToastCoroutine != null)
+        {
+            StopCoroutine(dropToastCoroutine);
+            dropToastCoroutine = null;
+        }
+
+        filesScroll?.Clear();
+        loadedFilePaths.Clear();
+        statusBadgeByPath.Clear();
+        unviewedNewPaths.Clear();
+
+        if (emptyFilesLabel != null)
+        {
+            emptyFilesLabel.style.display = DisplayStyle.Flex;
+        }
+
+        if (dropToastLabel != null)
+        {
+            dropToastLabel.style.display = DisplayStyle.None;
+        }
+
+        UpdateNewFilesIconBadge();
+    }
+
+    /// <summary>
     /// Called by ConversationController when the agent writes/modifies
     /// a file. Unlike a user drop, this gets a "NEW" badge on the row
     /// and a red dot on the folder icon until viewed.

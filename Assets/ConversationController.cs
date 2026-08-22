@@ -192,6 +192,17 @@ public class ConversationController : MonoBehaviour
         return clip;
     }
 
+    /// <summary>
+    /// Called every time Settings is saved successfully - not just
+    /// the first time, since Settings can be reopened later in the
+    /// same run. The backend starts a fresh session/scratch folder
+    /// on every /settings save, so the Files panel must match.
+    /// </summary>
+    public void ResetForNewSession()
+    {
+        files?.ClearSession();
+    }
+
     public void StartAgent()
     {
         if (hasStarted)
