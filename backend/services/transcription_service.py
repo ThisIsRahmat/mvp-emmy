@@ -1,37 +1,38 @@
-import whisper
+import numpy as np
+from faster_whisper import WhisperModel
+
 
 class TranscriptionService:
     def __init__(
         self,
-        model: str = "whisper",
-        model_name: str | None = None
+        model_name: str = "small.en",
     ):
-        self.model = model
-
-        if self.model == "whisper":
-            whisper_model = model_name or "base.en"
-
-            self.client = whisper.load_model(
-                whisper_model
-            )
-        else:
-            raise ValueError(
-                f"Unsupported STT model: {self.model}"
-            )
+        # CTranslate2-based reimplementation of Whisper - same
+        # accuracy, much faster on CPU (int8 quantized).
+        self.client = WhisperModel(
+            model_name,
+            device="cpu",
+            compute_type="int8",
+        )
 
     def transcribe_audio(
         self,
         audio_path
     ) -> str:
 
-        if self.model == "whisper":
-            result = self.client.transcribe(
-                str(audio_path), fp16=False, language='English'
-            )
+        segments, _info = self.client.transcribe(
+            str(audio_path),
+            language="en",
+            # Trims leading/trailing silence and noise before
+            # transcribing, which was contributing to garbled results.
+            vad_filter=True,
+        )
 
-            return result["text"].strip()
+        return "".join(segment.text for segment in segments).strip()
 
-        else:
-            raise ValueError(
-                f"Unsupported STT model: {self.model}"
-            )
+    def warm_up(self) -> None:
+        """Runs one throwaway inference so the first real request
+        doesn't pay the model's initial-call cost."""
+        silence = np.zeros(16000, dtype=np.float32)
+        segments, _info = self.client.transcribe(silence, language="en")
+        list(segments)

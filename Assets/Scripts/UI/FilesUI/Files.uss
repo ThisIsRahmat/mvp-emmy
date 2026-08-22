@@ -69,6 +69,23 @@
 }
 
 
+.new-files-icon-badge {
+    display: none;
+
+    position: absolute;
+    left: 52px;
+    top: 14px;
+
+    width: 14px;
+    height: 14px;
+
+    background-color: rgb(220, 60, 60);
+    border-radius: 7px;
+    border-width: 2px;
+    border-color: rgb(240, 240, 240);
+}
+
+
 .drop-toast-label {
     display: none;
 
@@ -164,6 +181,18 @@
 
     padding-left: 6px;
     padding-right: 6px;
+}
+
+
+.file-status--new {
+    color: rgb(255, 255, 255);
+    -unity-font-style: bold;
+
+    background-color: rgb(220, 60, 60);
+    border-radius: 8px;
+
+    padding-top: 2px;
+    padding-bottom: 2px;
 }
 
 

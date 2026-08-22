@@ -1,6 +1,5 @@
 using System;
 using System.Collections;
-using System.IO;
 using System.Text;
 using Shibuya24.Utility;
 using UnityEngine;
@@ -8,10 +7,13 @@ using UnityEngine.Networking;
 
 /// <summary>
 /// Receives files dragged from the OS (Finder/editor) onto the running
-/// standalone build via the UniDragAndDropForMac plugin, and imports
-/// them into the backend's project directory as agent context.
+/// standalone build via the UniDragAndDropForMac plugin, and registers
+/// them with the backend as agent context by path. Every participant's
+/// project lives somewhere different, so the backend reads the file
+/// directly from wherever it was dropped from rather than requiring a
+/// shared project folder - any file type is accepted, not just .cs.
 /// Requires UniDragAndDropForMac to be imported into the project
-/// (Mono scripting backend only) - see Assets/Plugins/macOS.
+/// (Mono scripting backend only) - see Assets/UniDragAndDrop.
 /// </summary>
 public class FileDropReceiver : MonoBehaviour
 {
@@ -44,51 +46,15 @@ public class FileDropReceiver : MonoBehaviour
             return;
         }
 
-        if (
-            !string.Equals(
-                Path.GetExtension(absolutePath),
-                ".cs",
-                StringComparison.OrdinalIgnoreCase
-            )
-        )
-        {
-            Debug.LogWarning(
-                $"Ignored dropped file (only .cs is supported): {absolutePath}"
-            );
-
-            return;
-        }
-
-        string content;
-
-        try
-        {
-            content = File.ReadAllText(absolutePath);
-        }
-        catch (Exception error)
-        {
-            Debug.LogError(
-                $"Could not read dropped file '{absolutePath}': {error.Message}"
-            );
-
-            return;
-        }
-
-        StartCoroutine(
-            ImportFile(
-                Path.GetFileName(absolutePath),
-                content
-            )
-        );
+        StartCoroutine(ImportFile(absolutePath));
     }
 
-    private IEnumerator ImportFile(string fileName, string content)
+    private IEnumerator ImportFile(string absolutePath)
     {
         string json = JsonUtility.ToJson(
             new ImportFileRequest
             {
-                name = fileName,
-                content = content,
+                path = absolutePath,
             }
         );
 
@@ -107,25 +73,24 @@ public class FileDropReceiver : MonoBehaviour
         if (request.result != UnityWebRequest.Result.Success)
         {
             Debug.LogError(
-                $"Could not import dropped file '{fileName}': " +
+                $"Could not import dropped file '{absolutePath}': " +
                 $"{request.error}\n{request.downloadHandler.text}"
             );
 
             yield break;
         }
 
-        Debug.Log($"Imported dropped file: {fileName}");
+        Debug.Log($"Imported dropped file: {absolutePath}");
 
         if (files != null)
         {
-            files.OnFileImported(fileName);
+            files.OnFileImported(absolutePath);
         }
     }
 
     [Serializable]
     private class ImportFileRequest
     {
-        public string name;
-        public string content;
+        public string path;
     }
 }

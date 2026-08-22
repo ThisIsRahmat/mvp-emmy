@@ -87,10 +87,30 @@ public class ConversationController : MonoBehaviour
     private bool isRecording;
     private bool hasStarted;
 
+    [Header("Filler Lines")]
+    [SerializeField]
+    private float fillerInitialDelayMinSeconds = 3f;
+
+    [SerializeField]
+    private float fillerInitialDelayMaxSeconds = 5f;
+
+    [SerializeField]
+    private float fillerMinGapSeconds = 15f;
+
+    [SerializeField]
+    private float fillerMaxGapSeconds = 20f;
+
     private Coroutine activeConversationCoroutine;
+    private Coroutine fillerCoroutine;
 
     private void Awake()
     {
+        // No VSync and no frame cap meant this rendered uncapped
+        // (100s of FPS for a simple scene), pegging the CPU/GPU
+        // continuously - this was starving the backend's STT/LLM/TTS
+        // processes of resources and contributing to swap thrashing.
+        Application.targetFrameRate = 60;
+
         ValidateReferences();
     }
 
@@ -467,6 +487,7 @@ public class ConversationController : MonoBehaviour
 
         isBusy = true;
         SetState(AgentState.Thinking);
+        StartFillers();
 
         byte[] audioBytes;
 
@@ -587,9 +608,12 @@ public class ConversationController : MonoBehaviour
         Debug.Log($"User transcription: {response.transcription}");
         Debug.Log($"Agent response: {response.response_speech}");
 
-        if (!string.IsNullOrWhiteSpace(response.response_code))
+        if (response.created_files != null)
         {
-            Debug.Log($"Generated code:\n{response.response_code}");
+            foreach (CreatedFile created in response.created_files)
+            {
+                Debug.Log($"Created file: {created.path} ({created.status})");
+            }
         }
 
         if (string.IsNullOrWhiteSpace(response.audio_url))
@@ -622,9 +646,23 @@ public class ConversationController : MonoBehaviour
             yield break;
         }
 
-        if (files != null)
+        if (files != null && response.created_files != null)
         {
-            files.RefreshFiles();
+            foreach (CreatedFile created in response.created_files)
+            {
+                if (string.IsNullOrWhiteSpace(created.path))
+                {
+                    continue;
+                }
+
+                // Existing files were written straight back to their
+                // real path - the user's own editor already picks up
+                // the change, no new row or badge needed here.
+                if (created.is_new)
+                {
+                    files.OnFileCreatedByAgent(created.path);
+                }
+            }
         }
 
         isBusy = false;
@@ -703,6 +741,8 @@ public class ConversationController : MonoBehaviour
             completed?.Invoke(false);
             yield break;
         }
+
+        StopFillers();
 
         yield return StartCoroutine(
             PlayClip(responseClip, completed)
@@ -784,7 +824,15 @@ public class ConversationController : MonoBehaviour
         if (codeText != null)
         {
             codeText.text =
-                response.response_code ?? string.Empty;
+                response.created_files is { Length: > 0 }
+                    ? string.Join(
+                        "\n",
+                        Array.ConvertAll(
+                            response.created_files,
+                            created => created.path
+                        )
+                    )
+                    : string.Empty;
         }
     }
 
@@ -822,6 +870,8 @@ public class ConversationController : MonoBehaviour
     {
         Debug.LogError(message);
 
+        StopFillers();
+
         if (speechAudioSource != null)
         {
             speechAudioSource.Stop();
@@ -831,6 +881,89 @@ public class ConversationController : MonoBehaviour
         isRecording = false;
 
         SetState(AgentState.Idle);
+    }
+
+    /// <summary>
+    /// Starts looping short filler lines ("Let me dig into that...")
+    /// on the speech AudioSource while the backend is processing, so
+    /// silence isn't the only feedback during Thinking. Loads
+    /// Assets/Resources/Fillers/&lt;voiceId&gt;/*.wav, matching the
+    /// greeting clips' folder-per-voice convention.
+    /// </summary>
+    private void StartFillers()
+    {
+        if (speechAudioSource == null)
+        {
+            return;
+        }
+
+        StopFillers();
+
+        fillerCoroutine = StartCoroutine(PlayFillerLoop());
+    }
+
+    private void StopFillers()
+    {
+        if (fillerCoroutine != null)
+        {
+            StopCoroutine(fillerCoroutine);
+            fillerCoroutine = null;
+        }
+
+        if (speechAudioSource != null)
+        {
+            speechAudioSource.Stop();
+        }
+    }
+
+    private IEnumerator PlayFillerLoop()
+    {
+        AudioClip[] fillerClips =
+            Resources.LoadAll<AudioClip>($"Fillers/{selectedVoiceId}");
+
+        if (fillerClips == null || fillerClips.Length == 0)
+        {
+            yield break;
+        }
+
+        // Reacting the instant Space is released feels robotic - a
+        // beat of silence first reads as "processing what you said".
+        yield return new WaitForSeconds(
+            UnityEngine.Random.Range(
+                fillerInitialDelayMinSeconds,
+                fillerInitialDelayMaxSeconds
+            )
+        );
+
+        int lastIndex = -1;
+
+        while (true)
+        {
+            int index = UnityEngine.Random.Range(0, fillerClips.Length);
+
+            if (fillerClips.Length > 1 && index == lastIndex)
+            {
+                index = (index + 1) % fillerClips.Length;
+            }
+
+            lastIndex = index;
+
+            AudioClip clip = fillerClips[index];
+
+            speechAudioSource.clip = clip;
+            speechAudioSource.Play();
+
+            yield return new WaitForSeconds(clip.length);
+
+            // Real speech has pauses between thoughts - back-to-back
+            // fillers read as unnatural/rapid-fire.
+            float gap = UnityEngine.Random.Range(
+                fillerMinGapSeconds,
+                fillerMaxGapSeconds
+            );
+
+            yield return new WaitForSeconds(gap);
+        }
     }
 
     private void ValidateReferences()
@@ -931,7 +1064,15 @@ public class AgentResponse
 {
     public string transcription;
     public string response_speech;
-    public string response_code;
     public string text;
     public string audio_url;
+    public CreatedFile[] created_files;
+}
+
+[Serializable]
+public class CreatedFile
+{
+    public string path;
+    public string status;
+    public bool is_new;
 }

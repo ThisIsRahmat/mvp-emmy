@@ -3,7 +3,6 @@ import time
 from pathlib import Path
 from shutil import copyfileobj
 from tempfile import NamedTemporaryFile
-from tkinter.tix import Form
 
 from fastapi import FastAPI, File, HTTPException, UploadFile, Form
 from fastapi.staticfiles import StaticFiles
@@ -13,7 +12,7 @@ from backend.services.transcription_service import TranscriptionService
 from backend.services.conversation_service import ConversationService
 from backend.services.llm_service import LLMService
 from backend.services.speech_service import SpeechService
-from backend.tools.file_tools import FileTools
+from backend.tools.file_tools import FileTools, resolve_write_target
 
 
 app = FastAPI()
@@ -65,13 +64,38 @@ conversation_service = ConversationService()
 def build_services(settings: AgentSettings):
 
     llm_service = LLMService(agent_type=settings.agent_type, custom_prompt=settings.custom_prompt)
-    speech_service = SpeechService( voice=settings.tts_voice, output_directory=audio_directory)
+    speech_service = SpeechService( voice=settings.tts_voice or "en_GB-alan-medium", output_directory=audio_directory)
 
     return llm_service, speech_service
+
+
+def warm_up(llm_service: LLMService, speech_service: SpeechService) -> None:
+    """
+    Ollama unloads the model between requests when idle, and Kokoro's
+    first inference pays a one-off compile/cache cost - both showed
+    up as 20-150s added to the first real turn. Eating that cost here
+    instead, at startup, keeps it off the user-facing latency.
+    """
+    try:
+        transcription_service.warm_up()
+    except Exception as error:
+        print(f"STT warm-up failed (non-fatal): {error}")
+
+    try:
+        speech_service.generate_speech("Ready.")
+    except Exception as error:
+        print(f"TTS warm-up failed (non-fatal): {error}")
+
+    try:
+        llm_service.generate_response(prompt="Hello", history=[])
+    except Exception as error:
+        print(f"LLM warm-up failed (non-fatal): {error}")
+
 
 # Initialize default services so endpoints work before a /settings call
 try:
     llm_service, speech_service = build_services(current_settings)
+    warm_up(llm_service, speech_service)
 except Exception:
     llm_service = None
     speech_service = None
@@ -92,6 +116,7 @@ def update_settings(settings: AgentSettings):
     try:
         # build and assign backend services for the selected models
         llm_service, speech_service = build_services(settings)
+        warm_up(llm_service, speech_service)
 
         current_settings = settings
 
@@ -126,7 +151,7 @@ def agent_respond(audio: UploadFile = File(...),
     selected_files
     )
 
-    file_contents = file_tools.read_files(
+    file_contents = file_tools.read_context_files(
         file_paths
     )
 
@@ -142,10 +167,16 @@ def agent_respond(audio: UploadFile = File(...),
 
         transcription = transcription_service.transcribe_audio(temporary_path)
 
-        # Snapshot history BEFORE adding the new user message
+        # Snapshot history BEFORE adding the new user message.
+        # Built as plain role/content dicts (not the pydantic
+        # ConversationMessage objects) since that's what the LLM
+        # client's messages list expects.
         history_for_llm = (
-            conversation_service.current_session.messages[
-                -MAX_HISTORY_MESSAGES:
+            [
+                {"role": m.role, "content": m.content}
+                for m in conversation_service.current_session.messages[
+                    -MAX_HISTORY_MESSAGES:
+                ]
             ]
             if conversation_service.current_session
             else []
@@ -172,26 +203,58 @@ def agent_respond(audio: UploadFile = File(...),
 
         t3 = time.time()
 
-        print(f"STT: {t1-t0:.1f}s | LLM: {t2-t1:.1f}s | TTS: {t3-t2:.1f}s")
+        print(
+            f"STT: {t1-t0:.1f}s | LLM: {t2-t1:.1f}s | TTS: {t3-t2:.1f}s | "
+            f"reply_len: {len(llm_result.response_speech)} chars | "
+            f"history_msgs: {len(history_for_llm)}"
+        )
 
 
 
 
-        # Only attempt a file write if the model actually returned file info
-        file_result = None
-        if llm_result.response_code and getattr(llm_result, "file_path", None):
-            file_result = file_tools.write_file(
-                llm_result.file_path,
-                llm_result.response_code,
+        # Write out every file the model produced this turn - a single
+        # request can create/modify more than one script.
+        created_files = []
+        session_id = (
+            conversation_service.current_session.session_id
+            if conversation_service.current_session
+            else "no-session"
+        )
+
+        for generated_file in llm_result.files:
+            target_path, is_existing = resolve_write_target(
+                generated_file.path,
+                file_paths,
             )
+
+            try:
+                if is_existing:
+                    result = file_tools.write_to_known_path(
+                        target_path,
+                        generated_file.content,
+                    )
+                else:
+                    result = file_tools.write_generated_file(
+                        session_id,
+                        target_path,
+                        generated_file.content,
+                    )
+
+                created_files.append(
+                    {
+                        "path": result["path"],
+                        "status": result["status"],
+                        "is_new": not is_existing,
+                    }
+                )
+            except (ValueError, FileNotFoundError) as error:
+                print(f"Could not write '{generated_file.path}': {error}")
 
         return {
             "transcription": transcription,
             "response_speech": llm_result.response_speech,
-            "response_code": llm_result.response_code,
             "audio_url": f"/audio/{relative_path.as_posix()}",
-            "file_status": file_result["status"] if file_result else None,
-            "file_path": file_result["path"] if file_result else None,
+            "created_files": created_files,
         }
 
     except Exception as error:
@@ -203,16 +266,42 @@ def agent_respond(audio: UploadFile = File(...),
             temporary_path.unlink()
 
 class ImportFileRequest(BaseModel):
-    name: str
-    content: str
+    path: str
 
 
 @app.post("/files/import")
 def import_file(payload: ImportFileRequest):
+    """
+    Registers a dropped file as agent context. Participants' files
+    live wherever their own project is, so this reads directly from
+    the given path rather than copying anything into a shared
+    project folder, and records it as a message in the conversation
+    history so it flows to the LLM on subsequent turns.
+    """
     try:
-        return file_tools.write_file(payload.name, payload.content)
-    except ValueError as error:
+        content = file_tools.read_context_file(payload.path)
+    except (FileNotFoundError, ValueError) as error:
         raise HTTPException(status_code=400, detail=str(error)) from error
+
+    if conversation_service.current_session is None:
+        conversation_service.start_session(
+            agent_type=current_settings.agent_type,
+            tts_voice=current_settings.tts_voice,
+        )
+
+    file_name = Path(payload.path).name
+
+    conversation_service.add_context_file_message(
+        file_name,
+        payload.path,
+        content,
+    )
+
+    return {
+        "status": "added",
+        "path": payload.path,
+        "name": file_name,
+    }
 
 
 @app.get("/files")
@@ -223,7 +312,10 @@ def list_files():
 
 @app.get("/files/content")
 def get_file_content(path: str):
-    content = file_tools.read_file(path)
+    try:
+        content = file_tools.read_context_file(path)
+    except (FileNotFoundError, ValueError) as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
 
     return {
         "path": path,
