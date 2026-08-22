@@ -6,7 +6,10 @@ from backend.models.api_models import GeneratedFile, PromptResponse
 # implemented regex to pull our code blocks from LLM response_speech
 FENCED_CODE_BLOCK = re.compile(
     r"(?:\*{0,2}\s*([\w./-]+\.cs)[:*\s]*\n+)?"
-    r"```(?:csharp|cs|c#)?\s*\n(.*?)\n?```",
+    # A space instead of a newline after the language tag (e.g.
+    # "```csharp .code-viewer {") used to break this entirely - \s*
+    # alone (no required \n) tolerates either.
+    r"```(?:csharp|cs|c#)?\s*(.*?)\n?```",
     re.DOTALL | re.IGNORECASE,
 )
 

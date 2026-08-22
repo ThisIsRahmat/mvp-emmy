@@ -678,11 +678,17 @@ public class ConversationController : MonoBehaviour
                 }
 
                 // Existing files were written straight back to their
-                // real path - the user's own editor already picks up
-                // the change, no new row or badge needed here.
+                // real path - the participant's own editor picks up
+                // the change too, but the panel still needs its own
+                // "UPDATED" badge so it's visible without switching
+                // windows.
                 if (created.is_new)
                 {
                     files.OnFileCreatedByAgent(created.path);
+                }
+                else
+                {
+                    files.OnFileModifiedByAgent(created.path);
                 }
             }
         }

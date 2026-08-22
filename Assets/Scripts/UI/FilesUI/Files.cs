@@ -1011,10 +1011,28 @@ public class Files : MonoBehaviour
     /// </summary>
     private void MarkAsNew(string filePath)
     {
+        SetStatusBadge(filePath, "NEW", "file-status--new");
+    }
+
+    /// <summary>
+    /// Flags a dropped-in file the agent just edited in place - same
+    /// unviewed-badge mechanism as MarkAsNew, but visually distinct
+    /// ("UPDATED", different colour) so it's clear this file already
+    /// existed and was changed, not created from scratch.
+    /// </summary>
+    private void MarkAsModified(string filePath)
+    {
+        SetStatusBadge(filePath, "UPDATED", "file-status--modified");
+    }
+
+    private void SetStatusBadge(string filePath, string text, string cssClass)
+    {
         if (statusBadgeByPath.TryGetValue(filePath, out Label badge))
         {
-            badge.text = "NEW";
-            badge.AddToClassList("file-status--new");
+            badge.text = text;
+            badge.RemoveFromClassList("file-status--new");
+            badge.RemoveFromClassList("file-status--modified");
+            badge.AddToClassList(cssClass);
             badge.style.display = DisplayStyle.Flex;
         }
 
@@ -1028,6 +1046,7 @@ public class Files : MonoBehaviour
         {
             badge.style.display = DisplayStyle.None;
             badge.RemoveFromClassList("file-status--new");
+            badge.RemoveFromClassList("file-status--modified");
         }
 
         unviewedNewPaths.Remove(filePath);
@@ -1116,6 +1135,29 @@ public class Files : MonoBehaviour
         }
 
         AddFileRow(displayName, filePath, isNew: true);
+    }
+
+    /// <summary>
+    /// Called by ConversationController when the agent edits a file
+    /// that was already dropped in (written back to its real path,
+    /// not the scratch folder). The row already exists from the
+    /// original drop - this just flags it as changed so it's visible
+    /// in the panel too, not only in the participant's own editor.
+    /// </summary>
+    public void OnFileModifiedByAgent(string filePath)
+    {
+        Debug.Log($"Files.OnFileModifiedByAgent called with: '{filePath}'");
+
+        if (loadedFilePaths.Contains(filePath))
+        {
+            MarkAsModified(filePath);
+            return;
+        }
+
+        // Shouldn't normally happen (an edit implies it was already
+        // tracked), but add it rather than silently drop the update.
+        AddFileRow(Path.GetFileName(filePath), filePath);
+        MarkAsModified(filePath);
     }
 
     /// <summary>

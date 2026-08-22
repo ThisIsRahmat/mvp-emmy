@@ -207,6 +207,18 @@ class FileTools:
         if not target.exists():
             raise FileNotFoundError(f"File no longer exists: {path}")
 
+        # This writes straight to the participant's real project file
+        # with no chance to review first - a bad generation (garbled
+        # content, wrong file matched) overwrites it silently. Keep
+        # a backup of whatever was there before every overwrite, so
+        # a bad write is always one copy away from being undone even
+        # if the file isn't tracked in git.
+        backup_path = target.with_suffix(target.suffix + ".emmy-backup")
+        backup_path.write_text(
+            target.read_text(encoding="utf-8"),
+            encoding="utf-8",
+        )
+
         target.write_text(content, encoding="utf-8")
 
         return {"status": "modified", "path": str(target)}
