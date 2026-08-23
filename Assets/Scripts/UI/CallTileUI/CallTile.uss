@@ -1,0 +1,30 @@
+.call-tile-frame {
+    flex-grow: 1;
+
+    border-width: 4px;
+    border-color: rgb(70, 70, 70);
+    border-radius: 14px;
+
+    transition-property: border-color;
+    transition-duration: 0.3s;
+}
+
+
+.call-tile-frame--speaking {
+    border-color: rgb(60, 189, 108);
+}
+
+
+.call-tile-name-label {
+    position: absolute;
+    left: 16px;
+    bottom: 16px;
+
+    padding: 6px 12px;
+
+    font-size: 14px;
+    color: rgb(255, 255, 255);
+
+    background-color: rgba(0, 0, 0, 0.6);
+    border-radius: 6px;
+}
