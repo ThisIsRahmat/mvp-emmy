@@ -85,9 +85,7 @@ def warm_up(llm_service: LLMService, speech_service: SpeechService) -> None:
         speech_service.generate_speech("Ready.")
     except Exception as error:
         print(f"TTS warm-up failed (non-fatal): {error}")
-
-
-
+        
     try:
         llm_service.generate_response(prompt="Hello", history=[])
     except Exception as error:
