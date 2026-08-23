@@ -79,6 +79,14 @@ public class ConversationController : MonoBehaviour
     [SerializeField]
     private TMP_Text codeText;
 
+    [Header("Call Tile")]
+    [SerializeField]
+    private CallTile callTile;
+
+    [Header("Settings / Conversation History")]
+    [SerializeField]
+    private Settings settingsUI;
+
     [Header("Input")]
     [SerializeField]
     private bool useSpaceToTalk = true;
@@ -862,6 +870,25 @@ public class ConversationController : MonoBehaviour
                     )
                     : string.Empty;
         }
+
+        settingsUI?.AddUserMessage(response.transcription);
+        settingsUI?.AddAgentMessage(response.response_speech);
+
+        if (response.created_files != null)
+        {
+            foreach (CreatedFile created in response.created_files)
+            {
+                if (string.IsNullOrWhiteSpace(created.path))
+                {
+                    continue;
+                }
+
+                settingsUI?.AddFileMessage(
+                    Path.GetFileName(created.path),
+                    created.is_new
+                );
+            }
+        }
     }
 
     private void SetState(AgentState state)
@@ -872,6 +899,8 @@ public class ConversationController : MonoBehaviour
         {
             statusText.text = state.ToString();
         }
+
+        callTile?.SetSpeaking(state == AgentState.Speaking);
 
         if (characterAnimator == null)
         {

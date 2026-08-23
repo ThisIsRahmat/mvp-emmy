@@ -1,0 +1,20 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements">
+
+    <Style src="CallTile.uss" />
+
+    <ui:VisualElement
+        name="call-tile-frame"
+        class="call-tile-frame"
+        picking-mode="Ignore"
+    >
+
+        <ui:Label
+            name="call-tile-name-label"
+            text="Emmy"
+            class="call-tile-name-label"
+            picking-mode="Ignore"
+        />
+
+    </ui:VisualElement>
+
+</ui:UXML>

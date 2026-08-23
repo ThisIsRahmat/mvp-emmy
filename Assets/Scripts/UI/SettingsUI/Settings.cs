@@ -20,6 +20,18 @@ public class Settings : MonoBehaviour
     [SerializeField]
     private ConversationController conversationController;
 
+    private ScrollView conversationScroll;
+
+    private VisualElement uiRoot;
+    private VisualElement settingsHeader;
+    private VisualElement settingsTabHeaderStrip;
+
+    private const float MinVisibleWindowMargin = 60f;
+
+    private bool isDraggingSettingsWindow;
+    private Vector2 settingsDragStartPointer;
+    private Vector2 settingsDragStartPosition;
+
     /*
      * Piper is the only provider we expose, so the voice list is flat:
      * a readable label for the dropdown paired with the backend voice id.
@@ -51,6 +63,8 @@ public class Settings : MonoBehaviour
         VisualElement root =
             uiDocument.rootVisualElement;
 
+        uiRoot = root;
+
         // Configure optional settings window and wrench button (if present)
         settingsWindow = root.Q<VisualElement>("settings-window");
         settingsWrenchButton = root.Q<Button>("settings-wrench-button");
@@ -58,18 +72,41 @@ public class Settings : MonoBehaviour
         {
             settingsWrenchButton.style.display = DisplayStyle.None;
             settingsWrenchButton.clicked += ToggleSettings;
+        }
 
-            settingsWindow = root.Q<VisualElement>("settings-window");
-settingsWrenchButton = root.Q<Button>("settings-wrench-button");
+        settingsHeader = root.Q<VisualElement>("settings-header");
 
-if (settingsWrenchButton != null)
-{
-    settingsWrenchButton.style.display = DisplayStyle.None;
-    settingsWrenchButton.clicked += ToggleSettings;
-}
+        conversationScroll = root.Q<ScrollView>("conversation-scroll");
 
-            
+        settingsTabHeaderStrip =
+            root.Q<VisualElement>(
+                className: "unity-tab-view__header-container"
+            );
 
+        if (settingsTabHeaderStrip == null)
+        {
+            Debug.LogWarning(
+                "Could not find the TabView's header strip " +
+                "(expected USS class 'unity-tab-view__header-container'). " +
+                "Clicking the Settings/Conversation History tab labels " +
+                "may start a window drag instead of switching tabs - " +
+                "check this if tab switching stops working."
+            );
+        }
+
+        if (settingsWindow != null)
+        {
+            settingsWindow.RegisterCallback<PointerDownEvent>(
+                OnSettingsWindowPointerDown
+            );
+
+            settingsWindow.RegisterCallback<PointerMoveEvent>(
+                OnSettingsWindowPointerMove
+            );
+
+            settingsWindow.RegisterCallback<PointerUpEvent>(
+                OnSettingsWindowPointerUp
+            );
         }
 
         // Find controls from UXML
@@ -358,6 +395,15 @@ if (settingsWrenchButton != null)
         settingsWrenchButton.style.display =
             DisplayStyle.Flex;
 
+        // Session is running - the wrench can reopen this window to
+        // view Conversation History, but the settings themselves
+        // (agent type, prompt, voice, Start button) are locked so
+        // they can't be changed mid-session.
+        agentTypeDropdown.SetEnabled(false);
+        customPromptField.SetEnabled(false);
+        ttsVoiceDropdown.SetEnabled(false);
+        saveSettingsButton.SetEnabled(false);
+
         if (conversationController != null)
         {
             /*
@@ -389,8 +435,228 @@ if (settingsWrenchButton != null)
             : DisplayStyle.Flex;
 }
 
+    /// <summary>
+    /// Appends a right-aligned chat bubble for something the user said.
+    /// </summary>
+    public void AddUserMessage(string text)
+    {
+        AddChatBubble(text, "chat-bubble--user", "chat-row--user");
+    }
+
+    /// <summary>
+    /// Appends a left-aligned chat bubble for the agent's spoken reply.
+    /// </summary>
+    public void AddAgentMessage(string text)
+    {
+        AddChatBubble(text, "chat-bubble--agent", "chat-row--agent");
+    }
+
+    /// <summary>
+    /// Appends a small centred system-style line for a file the agent
+    /// just wrote, e.g. "Created PlayerMovement.cs" or
+    /// "Modified PlayerMovement.cs".
+    /// </summary>
+    public void AddFileMessage(string fileName, bool isNew)
+    {
+        string verb = isNew ? "Created" : "Modified";
+
+        AddChatBubble(
+            $"{verb} {fileName}",
+            "chat-bubble--file",
+            "chat-row--file"
+        );
+    }
+
+    private void AddChatBubble(string text, string bubbleClass, string rowClass)
+    {
+        if (conversationScroll == null || string.IsNullOrWhiteSpace(text))
+        {
+            return;
+        }
+
+        VisualElement row = new VisualElement();
+        row.AddToClassList("chat-row");
+        row.AddToClassList(rowClass);
+
+        Label bubble = new Label(text);
+        bubble.AddToClassList("chat-bubble");
+        bubble.AddToClassList(bubbleClass);
+
+        row.Add(bubble);
+        conversationScroll.Add(row);
+
+        conversationScroll.schedule.Execute(
+            () => conversationScroll.ScrollTo(row)
+        );
+    }
+
+    // ----------------------------
+    // SETTINGS WINDOW DRAGGING
+    // ----------------------------
+
+    /// <summary>
+    /// Controls that need their own pointer input (dropdowns, the
+    /// prompt text field, the Start button, conversation scrolling,
+    /// and the tab-switching strip) are excluded from starting a
+    /// window drag - everywhere else on the window (including the
+    /// header and the empty space around fields) drags it, and this
+    /// is checked at click-time rather than tied to whether the
+    /// fields are currently enabled, so dragging keeps working after
+    /// Start locks them.
+    /// </summary>
+    private bool IsExcludedFromWindowDrag(VisualElement target)
+    {
+        if (target == null)
+        {
+            return false;
+        }
+
+        return
+            IsSameOrDescendant(agentTypeDropdown, target) ||
+            IsSameOrDescendant(customPromptField, target) ||
+            IsSameOrDescendant(ttsVoiceDropdown, target) ||
+            IsSameOrDescendant(saveSettingsButton, target) ||
+            IsSameOrDescendant(conversationScroll, target) ||
+            IsSameOrDescendant(settingsTabHeaderStrip, target);
+    }
+
+    private static bool IsSameOrDescendant(
+        VisualElement ancestor,
+        VisualElement target
+    )
+    {
+        return
+            ancestor != null &&
+            (ancestor == target || ancestor.Contains(target));
+    }
+
+    private void OnSettingsWindowPointerDown(PointerDownEvent evt)
+    {
+        if (evt.button != 0)
+        {
+            return;
+        }
+
+        if (IsExcludedFromWindowDrag(evt.target as VisualElement))
+        {
+            return;
+        }
+
+        isDraggingSettingsWindow = true;
+
+        settingsDragStartPointer = evt.position;
+
+        settingsDragStartPosition = new Vector2(
+            settingsWindow.resolvedStyle.left,
+            settingsWindow.resolvedStyle.top
+        );
+
+        settingsWindow.CapturePointer(evt.pointerId);
+
+        evt.StopPropagation();
+    }
+
+    private void OnSettingsWindowPointerMove(PointerMoveEvent evt)
+    {
+        if (
+            !isDraggingSettingsWindow ||
+            !settingsWindow.HasPointerCapture(evt.pointerId)
+        )
+        {
+            return;
+        }
+
+        Vector2 currentPointer = new Vector2(evt.position.x, evt.position.y);
+        Vector2 delta = currentPointer - settingsDragStartPointer;
+
+        Vector2 clamped = ClampWindowPosition(
+            settingsWindow,
+            settingsDragStartPosition.x + delta.x,
+            settingsDragStartPosition.y + delta.y
+        );
+
+        settingsWindow.style.left = clamped.x;
+        settingsWindow.style.top = clamped.y;
+
+        evt.StopPropagation();
+    }
+
+    private void OnSettingsWindowPointerUp(PointerUpEvent evt)
+    {
+        if (!isDraggingSettingsWindow)
+        {
+            return;
+        }
+
+        isDraggingSettingsWindow = false;
+
+        if (settingsWindow.HasPointerCapture(evt.pointerId))
+        {
+            settingsWindow.ReleasePointer(evt.pointerId);
+        }
+
+        evt.StopPropagation();
+    }
+
+    /// <summary>
+    /// Keeps at least MinVisibleWindowMargin worth of the dragged
+    /// window within the visible root area on every side, so its
+    /// header can never end up fully off-screen and unreachable.
+    /// </summary>
+    private Vector2 ClampWindowPosition(
+        VisualElement window,
+        float proposedLeft,
+        float proposedTop
+    )
+    {
+        if (uiRoot == null)
+        {
+            return new Vector2(proposedLeft, proposedTop);
+        }
+
+        float rootWidth = uiRoot.resolvedStyle.width;
+        float rootHeight = uiRoot.resolvedStyle.height;
+        float windowWidth = window.resolvedStyle.width;
+        float windowHeight = window.resolvedStyle.height;
+
+        float minLeft = MinVisibleWindowMargin - windowWidth;
+        float maxLeft = rootWidth - MinVisibleWindowMargin;
+
+        float minTop = 0f;
+        float maxTop = rootHeight - MinVisibleWindowMargin;
+
+        float clampedLeft = Mathf.Clamp(
+            proposedLeft,
+            Mathf.Min(minLeft, maxLeft),
+            Mathf.Max(minLeft, maxLeft)
+        );
+
+        float clampedTop = Mathf.Clamp(
+            proposedTop,
+            Mathf.Min(minTop, maxTop),
+            Mathf.Max(minTop, maxTop)
+        );
+
+        return new Vector2(clampedLeft, clampedTop);
+    }
+
     private void OnDisable()
     {
+        if (settingsWindow != null)
+        {
+            settingsWindow.UnregisterCallback<PointerDownEvent>(
+                OnSettingsWindowPointerDown
+            );
+
+            settingsWindow.UnregisterCallback<PointerMoveEvent>(
+                OnSettingsWindowPointerMove
+            );
+
+            settingsWindow.UnregisterCallback<PointerUpEvent>(
+                OnSettingsWindowPointerUp
+            );
+        }
+
         if (saveSettingsButton != null)
         {
             saveSettingsButton.clicked -=

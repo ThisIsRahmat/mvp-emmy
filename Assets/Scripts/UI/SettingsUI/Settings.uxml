@@ -11,6 +11,18 @@
             class="emmy-window"
         >
 
+            <ui:VisualElement
+                name="settings-header"
+                class="settings-header"
+            >
+
+                <ui:Label
+                    text="Settings"
+                    class="settings-title"
+                />
+
+            </ui:VisualElement>
+
             <ui:TabView
                 name="emmy-tab-view"
                 reorderable="false"
