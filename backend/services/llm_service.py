@@ -78,16 +78,38 @@ def extract_code_blocks_from_speech(
 
 
 response_instructions = (
-     "You must always respond in JSON using two fields:\n"
-                    "- response_speech: ONLY natural spoken language, this is your response in the conversation and is READ ALOUD by a text-to-speech engine. It must NEVER under ANY CIRCUMSTANCE contain ANY code, brace characters, semicolons, or anything that is not part of natural speech. It is your written response to the user and should be concise, clear, and helpful.\n"
-                    "- files: a list of {path, content} objects, one per file you are creating or changing. content is the COMPLETE file, ready to save exactly as given - not a description of it. Leave files empty ([]) if this turn doesn't need a file change. If you are editing a file that was shown to you above under 'These project files are currently selected', you MUST use that exact same path string, character for character - do not shorten it or invent a new one. Only make up a new path when the file genuinely does not exist yet.\n"
-                    "You may write more than one file in a single turn if the request needs it - add one entry per file.\n\n" )
-
-example_json = "{\"response_speech\": \"<your spoken response here>\", \"files\": [{\"path\": \"<file path>\", \"content\": \"<file content>\"}]}"
+    "RULES - follow every one of these on every reply:\n"
+    "1. Respond with valid JSON containing exactly two fields: response_speech and files.\n"
+    "2. response_speech is read aloud by text-to-speech. It must contain ONLY natural spoken "
+    "language - no code, braces, semicolons, or file paths as literal syntax. Whenever you "
+    "create or modify a script, say its name and briefly describe what it does (or what "
+    "changed, for an edit).\n"
+    "3. This is always a Unity C# project. Never ask what language or framework to use, and "
+    "never ask clarifying questions before writing code - if a request is ambiguous, make a "
+    "reasonable assumption and act on it.\n"
+    "4. If response_speech states or implies you are creating or modifying a file, files MUST "
+    "NOT be empty - the actual file belongs in files, not just a description of it.\n"
+    "5. files is a list of {path, content} objects. content must be the COMPLETE file, ready to "
+    "save exactly as given.\n"
+    "6. When editing a file shown above under 'These project files are currently selected', "
+    "reuse that exact path string character-for-character. Only invent a new path when the "
+    "file genuinely does not exist yet.\n"
+    "7. Include more than one entry in files if the request needs more than one file changed.\n"
+    "8. Leave files as [] only when the turn genuinely needs no file change (e.g. a question "
+    "or discussion with no code request).\n\n"
+    "EXAMPLE\n"
+    "User: \"Add a jump function to PlayerMovement.cs using Rigidbody.\"\n"
+    "Correct response:\n"
+    "{\"response_speech\": \"I've added a Jump function to PlayerMovement that applies an "
+    "upward impulse force.\", \"files\": [{\"path\": \"Assets/Scripts/PlayerMovement.cs\", "
+    "\"content\": \"using UnityEngine;\\n\\npublic class PlayerMovement : MonoBehaviour {\\n    "
+    "public void Jump(float force) {\\n        GetComponent<Rigidbody>().AddForce(Vector3.up * "
+    "force, ForceMode.Impulse);\\n    }\\n}\"}]}\n\n"
+)
 
 class LLMService:
     def __init__(self,
-                 model: str = "gemma3:4b",
+                 model: str = "qwen2.5-coder:7b",
                  agent_type: str = "Peer",
                  custom_prompt: str = ""):
         self.model = model
@@ -101,8 +123,7 @@ class LLMService:
                 "Acts as a guide for the learner through programming problems a in pAIr programming session with the developer as the driver .\n"
                 "Explain concepts clearly.\n"
                 "Ask guiding questions where appropriate.\n"
-                 + response_instructions + 
-                 "Return valid JSON using this schema:" + example_json
+                 + response_instructions
             )
 
         if self.agent_type == "Peer":
@@ -111,13 +132,12 @@ class LLMService:
                 "Act as a teammate collaborating with the developer in a pAIr programming session with the developer as the driver.\n"
                 "Discuss ideas, trade-offs and implementation choices when asked.\n"
                 "Give concise and practical coding assistance.\n"
-                           + response_instructions + 
-                                 "Return valid JSON using this schema:" + example_json
+                           + response_instructions
             )
 
         if self.agent_type == "Other" and self.custom_prompt.strip():
-            self.custom_prompt = self.custom_prompt.strip() + "\n\n" + response_instructions + "Return valid JSON using this schema:" + example_json
-            return self.custom_prompt.strip() 
+            self.custom_prompt = self.custom_prompt.strip() + "\n\n" + response_instructions
+            return self.custom_prompt.strip()
 
         return "You are a helpful AI coding companion."
 
@@ -168,7 +188,12 @@ class LLMService:
             # a real file (plus JSON string-escaping overhead) can
             # easily blow past that, cutting generation off mid-file
             # with technically-invalid JSON.
-            options={"num_predict": 2048, "repeat_penalty": 1.3},
+            # Ollama defaults num_ctx to 4096 when unset, which silently
+            # truncates from the FRONT of the context once history + file
+            # context grow past that - dropping the system prompt (with
+            # the file-writing instructions) first. qwen2.5-coder:7b
+            # supports up to 32768, so give it real headroom.
+            options={"num_predict": 2048, "repeat_penalty": 1.1, "num_ctx": 8192},
         )
 
         print(f"Raw LLM JSON: {response['message']['content']}")
