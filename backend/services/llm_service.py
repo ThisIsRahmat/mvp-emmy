@@ -78,6 +78,7 @@ def extract_code_blocks_from_speech(
 
 
 response_instructions = (
+     "This is always a Unity C# project - never ask what language or framework to use, and never ask clarifying questions before writing code. If a request is a bit ambiguous, make a reasonable assumption and write the file anyway; you can mention the assumption briefly in response_speech.\n"
      "You must always respond in JSON using two fields:\n"
                     "- response_speech: ONLY natural spoken language, this is your response in the conversation and is READ ALOUD by a text-to-speech engine. It must NEVER under ANY CIRCUMSTANCE contain ANY code, brace characters, semicolons, or anything that is not part of natural speech. It is your written response to the user and should be concise, clear, and helpful.\n"
                     "- files: a list of {path, content} objects, one per file you are creating or changing. content is the COMPLETE file, ready to save exactly as given - not a description of it. Leave files empty ([]) if this turn doesn't need a file change. If you are editing a file that was shown to you above under 'These project files are currently selected', you MUST use that exact same path string, character for character - do not shorten it or invent a new one. Only make up a new path when the file genuinely does not exist yet.\n"
@@ -87,7 +88,7 @@ example_json = "{\"response_speech\": \"<your spoken response here>\", \"files\"
 
 class LLMService:
     def __init__(self,
-                 model: str = "gemma3:4b",
+                 model: str = "qwen2.5-coder:7b",
                  agent_type: str = "Peer",
                  custom_prompt: str = ""):
         self.model = model

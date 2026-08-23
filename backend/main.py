@@ -88,11 +88,10 @@ def warm_up(llm_service: LLMService, speech_service: SpeechService) -> None:
 
 
 
-# testing to see if still need the warm up for LLM now using gemma model
-    # try:
-    #     llm_service.generate_response(prompt="Hello", history=[])
-    # except Exception as error:
-    #     print(f"LLM warm-up failed (non-fatal): {error}")
+    try:
+        llm_service.generate_response(prompt="Hello", history=[])
+    except Exception as error:
+        print(f"LLM warm-up failed (non-fatal): {error}")
 
 
 # Initialize default services so endpoints work before a /settings call
